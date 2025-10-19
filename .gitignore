@@ -1,0 +1,13 @@
+*
+!.gitignore
+!LICENSE
+!README.md
+!install.sh
+!init.el
+!early-init.el
+!lisp/
+!lisp/**
+!examples/
+!examples/**
+
+*.elc
