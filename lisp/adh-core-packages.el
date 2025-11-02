@@ -121,6 +121,11 @@
   :config
   (adh--rename-mode 'visual-line-mode " wrap"))
 
+(use-package c-ts-mode
+  :ensure nil :defer t
+  :hook
+  (c-ts-mode . (lambda () (setq-local comment-start "// ") (setq-local comment-end ""))))
+
 (use-package rust-ts-mode
   :ensure nil :defer t
   :config
