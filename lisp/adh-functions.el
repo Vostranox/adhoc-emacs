@@ -177,7 +177,8 @@
        '((side . bottom)
          (window-height . 30)
          (window-parameters . ((no-other-window . t)))
-         (body-function . select-window))))))
+         (body-function . select-window)))))
+  (shrink-window-if-larger-than-buffer))
 
 (defun adh-insert-line-above ()
   (interactive)
