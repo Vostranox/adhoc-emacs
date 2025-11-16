@@ -24,7 +24,7 @@
          (global-corfu-mode 'toggle))))
 
 (use-package company
-  :ensure t
+  :ensure t :defer t
   :custom
   (company-idle-delay 0.2)
   (company-minimum-prefix-length 3)
@@ -41,7 +41,7 @@
   (company-mode . company-posframe-mode))
 
 (use-package corfu
-  :ensure t
+  :ensure t :defer t
   :custom
   (corfu-auto t)
   (corfu-auto-delay 0.2)
