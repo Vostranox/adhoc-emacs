@@ -5,37 +5,46 @@
       (consult-fd i (buffer-substring-no-properties (region-beginning) (region-end)))
     (consult-fd i)))
 
+(defun adh--consult-fd-directories (&optional arg)
+  (let ((consult-fd-args (concat adh--consult-fd-args " -t directory --prune")))
+    (consult-fd arg)))
+
 (defun adh--consult-ripgrep-with-region (&optional i)
   (if (use-region-p)
       (consult-ripgrep i (buffer-substring-no-properties (region-beginning) (region-end)))
     (consult-ripgrep i)))
 
-(defun adh-consult-imenu-any ()
+(defun adh-consult-fd-here ()
   (interactive)
-  (let ((consult-preview-key 'any))
-    (consult-imenu)))
+  (adh--consult-fd-with-region default-directory))
+
+(defun adh-consult-fd-directories-here ()
+  (interactive)
+  (adh--consult-fd-directories default-directory))
 
 (defun adh-consult-ripgrep-here ()
   (interactive)
   (adh--consult-ripgrep-with-region default-directory))
 
+(defun adh-consult-fd-project ()
+  (interactive)
+  (adh--consult-fd-with-region (adh--get-project-dir)))
+
+(defun adh-consult-fd-directories-project ()
+  (interactive)
+  (adh--consult-fd-directories (adh--get-project-dir)))
+
 (defun adh-consult-ripgrep-project ()
   (interactive)
   (adh--consult-ripgrep-with-region (adh--get-project-dir)))
 
+(defun adh-consult-fd-all ()
+  (interactive)
+  (adh--consult-fd-with-region 1))
+
 (defun adh-consult-ripgrep-all ()
   (interactive)
   (adh--consult-ripgrep-with-region 1))
-
-(defun adh-consult-fd-directories (&optional arg)
-  (interactive)
-  (let ((consult-fd-args (concat adh--consult-fd-args " -t directory --prune")))
-    (consult-fd arg)))
-
-(defun adh-consult-goto-line ()
-  (interactive)
-  (let ((consult-preview-key 'any))
-    (consult-goto-line)))
 
 (defun adh-consult-line-with-region ()
   (interactive)
@@ -45,6 +54,16 @@
           (deactivate-mark)
           (consult-line input))
       (consult-line))))
+
+(defun adh-consult-imenu ()
+  (interactive)
+  (let ((consult-preview-key 'any))
+    (consult-imenu)))
+
+(defun adh-consult-goto-line ()
+  (interactive)
+  (let ((consult-preview-key 'any))
+    (consult-goto-line)))
 
 (defun adh-consult-select-window ()
   (interactive)
@@ -77,7 +96,7 @@
                 unread-command-events)))
 
 (use-package consult
-  :ensure t :demand t :after embark
+  :ensure t :after embark
   :custom
   (consult-buffer-filter "\\*")
   (consult-narrow-key "C-,")
@@ -106,15 +125,15 @@
       (when consult--narrow-overlay
         (let* ((label (alist-get consult--narrow
                                  (plist-get consult--narrow-config :keys)))
-               (text  (format "%s" label))
-               (prop  (propertize (concat " " text)
-                                  'face 'consult-narrow-indicator)))
+               (text (format "%s" label))
+               (prop (propertize (concat " " text)
+                                 'face 'consult-narrow-indicator)))
           (overlay-put consult--narrow-overlay 'before-string prop)))))
   :hook
   (embark-collect-mode . consult-preview-at-point-mode))
 
 (use-package embark
-  :ensure t :demand t
+  :ensure t
   :custom
   (embark-indicators
    '(embark-minimal-indicator

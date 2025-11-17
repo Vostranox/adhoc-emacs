@@ -3,11 +3,6 @@
 (defmacro => (&rest body)
   `(lambda () (interactive) ,@body))
 
-;; full global override (unused)
-(defvar adh-global-map (make-sparse-keymap))
-(unless (member `((t . ,adh-global-map)) emulation-mode-map-alists)
-  (add-to-list 'emulation-mode-map-alists `((t . ,adh-global-map))))
-
 ;; global-map
 (keymap-set global-map "<backspace>" #'adh-backward-delete-char-dwim)
 
@@ -103,10 +98,6 @@
 (keymap-set adh-command-map "C-u" #'vundo)
 (keymap-set adh-command-map "C-h" #'help-command)
 
-;; adh-command2-map
-(defvar-keymap adh-command2-map)
-(keymap-set global-map "M-c" adh-command2-map)
-
 ;; C-x map
 (keymap-set global-map "C-x j" (=> (find-file (adh--get-project-dir))))
 (keymap-set global-map "C-x C-j"  #'dired-jump)
@@ -114,10 +105,6 @@
 (keymap-set global-map "C-x C-f" #'find-file)
 (keymap-set global-map "C-x RET f" #'set-buffer-file-coding-system)
 (keymap-set global-map "C-x RET o" #'adh-show-buffer-file-encoding)
-(keymap-set global-map "C-x -" #'shrink-window-if-larger-than-buffer)
-(keymap-set global-map "C-x n d" #'narrow-to-defun)
-(keymap-set global-map "C-x n n" #'narrow-to-region)
-(keymap-set global-map "C-x n w" #'widen)
 (keymap-set global-map "C-x ," #'next-error)
 (keymap-set global-map "C-x ." #'previous-error)
 
@@ -128,11 +115,11 @@
 ;; adh-find-keymap
 (defvar-keymap adh-find-keymap)
 ;; adh-find-keymap keys
-(keymap-set adh-find-keymap "f" (=> (adh--consult-fd-with-region default-directory)))
-(keymap-set adh-find-keymap "o" (=> (adh-consult-fd-directories default-directory)))
-(keymap-set adh-find-keymap "h" (=> (adh--consult-fd-with-region (adh--get-project-dir))))
-(keymap-set adh-find-keymap "a" (=> (adh-consult-fd-directories (adh--get-project-dir))))
-(keymap-set adh-find-keymap "e" (=> (adh--consult-fd-with-region 1)))
+(keymap-set adh-find-keymap "f" #'adh-consult-fd-here)
+(keymap-set adh-find-keymap "o" #'adh-consult-fd-directories-here)
+(keymap-set adh-find-keymap "h" #'adh-consult-fd-project)
+(keymap-set adh-find-keymap "a" #'adh-consult-fd-directories-project)
+(keymap-set adh-find-keymap "e" #'adh-consult-fd-all)
 (keymap-set adh-find-keymap "p" #'consult-locate)
 ;; adh-find-keymap to adh-leader-map
 (keymap-set adh-leader-map "s" adh-find-keymap)
@@ -143,7 +130,7 @@
 (keymap-set adh-search-keymap "f" #'adh-consult-ripgrep-here)
 (keymap-set adh-search-keymap "h" #'adh-consult-ripgrep-project)
 (keymap-set adh-search-keymap "e" #'adh-consult-ripgrep-all)
-(keymap-set adh-search-keymap "o" #'adh-consult-imenu-any)
+(keymap-set adh-search-keymap "o" #'adh-consult-imenu)
 (keymap-set adh-search-keymap "a" #'adh-consult-line-with-region)
 ;; adh-search-keymap to adh-leader-map
 (keymap-set adh-leader-map "t" adh-search-keymap)
@@ -234,8 +221,8 @@
 ;; adh-buffer-keymap
 (defvar-keymap adh-buffer-keymap)
 ;; adh-buffer-keymap keys
-(keymap-set adh-buffer-keymap "l" #'persp-kill-buffer*)
-(keymap-set adh-buffer-keymap "d" #'adh-kill-persp-other-buffers)
+(keymap-set adh-buffer-keymap "l" #'kill-buffer)
+(keymap-set adh-buffer-keymap "d" #'adh-kill-other-buffers)
 (keymap-set adh-buffer-keymap "c" #'kill-current-buffer)
 (keymap-set adh-buffer-keymap "b" #'adh-kill-matching-buffers-no-ask-except-current)
 (keymap-set adh-buffer-keymap "n" #'align-regexp)
@@ -247,23 +234,20 @@
 (keymap-set adh-buffer-keymap "m" #'eval-buffer)
 (keymap-set adh-buffer-keymap "w" #'eval-region)
 (keymap-set adh-buffer-keymap "h" #'ibuffer)
+(keymap-set adh-buffer-keymap "a" #'scratch-buffer)
 ;; adh-buffer-keymap to adh-leader-map
 (keymap-set adh-leader-map "a" adh-buffer-keymap)
 
-;; adh-persp-keymap
-(defvar-keymap adh-persp-keymap)
-;; adh-persp-keymap keys
-(keymap-set adh-persp-keymap "l" #'persp-switch-to-scratch-buffer)
-(keymap-set adh-persp-keymap "d" #'persp-kill-others)
-(keymap-set adh-persp-keymap "c" #'persp-kill)
-(keymap-set adh-persp-keymap "r" #'persp-rename)
-(keymap-set adh-persp-keymap "t" #'persp-prev)
-(keymap-set adh-persp-keymap "s" #'persp-next)
-(keymap-set adh-persp-keymap "n" #'adh-persp-toggle-buffer-narrow)
-(keymap-set adh-persp-keymap "x" #'persp-unmerge)
-(keymap-set adh-persp-keymap "m" #'persp-merge)
-;; adh-persp-keymap to adh-leader-map
-(keymap-set adh-leader-map "e" adh-persp-keymap)
+;; adh-tab-keymap
+(defvar-keymap adh-tab-keymap)
+;; adh-tab-keymap keys
+(keymap-set adh-tab-keymap "d" #'tab-close-other)
+(keymap-set adh-tab-keymap "c" #'tab-close)
+(keymap-set adh-tab-keymap "r" #'tab-rename)
+(keymap-set adh-tab-keymap "t" #'tab-previous)
+(keymap-set adh-tab-keymap "s" #'tab-next)
+;; adh-tab-keymap to adh-leader-map
+(keymap-set adh-leader-map "e" adh-tab-keymap)
 
 ;; adh-bookmark-keymap
 (defvar-keymap adh-bookmark-keymap)
@@ -277,7 +261,7 @@
 ;; adh-leader-map
 (defvar-keymap adh-leader-map)
 ;; adh-leader-map keys
-(keymap-set adh-leader-map "l" #'persp-switch)
+(keymap-set adh-leader-map "l" #'tab-switch)
 (keymap-set adh-leader-map "d" #'adh-consult-select-window)
 (keymap-set adh-leader-map "c" #'consult-buffer)
 (keymap-set adh-leader-map "b" #'consult-bookmark)

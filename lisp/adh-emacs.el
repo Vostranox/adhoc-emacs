@@ -111,6 +111,7 @@
   (recentf-max-saved-items 5000)
 
   (tab-bar-show nil)
+  (tab-bar-new-tab-choice "*scratch*")
   (tab-bar-new-button-show nil)
   (tab-bar-close-button-show nil)
 
@@ -170,7 +171,7 @@
   (savehist-mode 1)
   (winner-mode 1)
   :hook
-  (emacs-startup . (lambda () (message "[adh] Activated %d packages in %s" (length package-activated-list) (emacs-init-time))))
+  (emacs-startup . (lambda () (tab-bar-rename-tab "dev") (message "[adh] Activated %d packages in %s" (length package-activated-list) (emacs-init-time))))
   (text-mode . visual-line-mode)
   (before-save . delete-trailing-whitespace))
 

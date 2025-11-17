@@ -43,7 +43,6 @@
 (adh-require! 'adh-minibuffer)
 (adh-require! 'adh-prog-modes)
 (adh-require! 'adh-consult)
-(adh-require! 'adh-perspective)
 (adh-require! 'adh-magit)
 (adh-require! 'adh-meow)
 (adh-require! 'adh-modeline)

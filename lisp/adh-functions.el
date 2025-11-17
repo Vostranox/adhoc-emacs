@@ -221,6 +221,14 @@
       (kill-region (region-beginning) (region-end))
     (kill-line)))
 
+(defun adh-kill-other-buffers ()
+  (interactive)
+  (let ((current (current-buffer)))
+    (dolist (buf (buffer-list))
+      (unless (or (eq buf current)
+                  (string= (buffer-name buf) "*scratch*"))
+        (kill-buffer buf)))))
+
 (defun adh-kill-matching-buffers-no-ask-except-current (regexp &optional internal-too)
   (interactive
    (list (read-regexp "Kill buffers: ")

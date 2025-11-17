@@ -1,6 +1,5 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-(adh-persp-enable-buffer-narrow)
 (adh-set-completion-backend 'company)
 (adh-set-font adh-mono-spaced-font 80)
 (set-frame-parameter nil 'undecorated t)
