@@ -32,7 +32,7 @@
 (defun adh-eglot-format-buffer ()
   (interactive)
   (when (and (eglot-managed-p)
-             (eglot--server-capable :documentFormattingProvider))
+             (eglot-server-capable :documentFormattingProvider))
     (eglot-format-buffer)
     (when (eq system-type 'windows-nt)
       (save-excursion

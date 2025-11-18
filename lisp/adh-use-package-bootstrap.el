@@ -5,6 +5,7 @@
 (require 'use-package)
 (setq use-package-verbose nil)
 (when (native-comp-available-p)
+  (setq package-native-compile t)
   (setq native-comp-async-report-warnings-errors 'silent))
 
 (provide 'adh-use-package-bootstrap)

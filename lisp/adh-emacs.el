@@ -122,7 +122,7 @@
                 indent-tabs-mode nil
                 tab-width 4)
 
-  (define-advice find-file (:before (filename &optional wildcards) adh--make-dir)
+  (define-advice find-file (:before (filename &optional _) adh--make-dir)
     (unless (file-exists-p filename)
       (let ((dir (file-name-directory filename)))
         (unless (file-exists-p dir)

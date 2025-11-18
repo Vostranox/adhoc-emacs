@@ -378,8 +378,9 @@
   (keymap-set vertico-multiform-map "<right>" #'forward-char))
 
 (with-eval-after-load 'vertico-reverse
-  (keymap-set vertico-reverse-map "C-a" #'vertico-previous)
-  (keymap-set vertico-reverse-map "C-e" #'vertico-next))
+  (when (boundp 'vertico-reverse-map)
+    (keymap-set vertico-reverse-map "C-a" #'vertico-previous)
+    (keymap-set vertico-reverse-map "C-e" #'vertico-next)))
 
 ;; Completion preview
 (with-eval-after-load 'completion-preview
@@ -510,12 +511,14 @@
 
 ;; Git rebase
 (with-eval-after-load 'git-rebase
-  (keymap-set git-rebase-mode-map "M-a" #'git-rebase-move-line-down)
-  (keymap-set git-rebase-mode-map "M-e" #'git-rebase-move-line-up))
+  (when (boundp 'git-rebase-mode-map)
+    (keymap-set git-rebase-mode-map "M-a" #'git-rebase-move-line-down)
+    (keymap-set git-rebase-mode-map "M-e" #'git-rebase-move-line-up)))
 
 ;; nXml
 (with-eval-after-load 'nxml-mode
-  (setq nxml-mode-map (make-sparse-keymap))
-  (set-keymap-parent nxml-mode-map text-mode-map))
+  (when (boundp 'nxml-mode-map)
+    (setq nxml-mode-map (make-sparse-keymap))
+    (set-keymap-parent nxml-mode-map text-mode-map)))
 
 (provide 'adh-keybinds)

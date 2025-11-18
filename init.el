@@ -23,8 +23,13 @@
       (message "[adh] Failed to load %s: %s" ,filename (error-message-string err))
       nil)))
 
+(defgroup adhoc nil
+  "AdHoc Emacs group"
+  :group 'applications)
+
 (defcustom adh-completion-backend 'company
   "Completion backend"
+  :group 'adhoc
   :type '(choice (const :tag "Corfu" corfu)
                  (const :tag "Company" company)))
 
