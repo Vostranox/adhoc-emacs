@@ -515,6 +515,12 @@
     (keymap-set git-rebase-mode-map "M-a" #'git-rebase-move-line-down)
     (keymap-set git-rebase-mode-map "M-e" #'git-rebase-move-line-up)))
 
+;; Markdown
+(with-eval-after-load 'markdown-mode
+  (when (boundp 'markdown-mode-map)
+    (setq markdown-mode-map (make-sparse-keymap))
+    (set-keymap-parent markdown-mode-map text-mode-map)))
+
 ;; nXml
 (with-eval-after-load 'nxml-mode
   (when (boundp 'nxml-mode-map)

@@ -145,9 +145,8 @@
                            (let ((bn (buffer-name)))
                              (when (string-match "\\*Embark Export: .* - \\(.*\\)\\*" bn)
                                (let ((search-input (match-string 1 bn)))
-                                 (rename-buffer (format "*e: %s: %s"
-                                                        (replace-regexp-in-string "-mode$" "" (symbol-name major-mode))
-                                                        search-input) t)))))))
+                                 (rename-buffer (format "*e: %s: %s" (replace-regexp-in-string "-mode$" "" (symbol-name major-mode)) search-input) t)
+                                 (adh-to-side-window)))))))
 
 (use-package embark-consult
   :ensure t :after (consult embark))
