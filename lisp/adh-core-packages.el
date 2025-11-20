@@ -7,8 +7,8 @@
         (isearch-mode forward)
         (isearch-yank-string search-string))
     (if forward
-        (isearch-forward)
-      (isearch-backward))))
+        (call-interactively #'isearch-forward)
+      (call-interactively #'isearch-backward))))
 
 (defun adh-isearch-forward-with-region ()
   (interactive)
