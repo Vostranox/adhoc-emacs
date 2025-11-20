@@ -87,6 +87,14 @@
                'magit-mode)))))
 
 ;;;; Interactive
+(defun adh-split-below-root ()
+  (interactive)
+  (split-window (frame-root-window) nil 'below))
+
+(defun adh-split-right-root ()
+  (interactive)
+  (split-window (frame-root-window) nil 'right))
+
 (defun adh-scroll-up-half ()
   (interactive)
   (forward-line (- (adh--half-window-height)))
