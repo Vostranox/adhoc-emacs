@@ -205,7 +205,7 @@
 (defvar-keymap adh-window-keymap)
 ;; adh-window-keymap keys
 (keymap-set adh-window-keymap "l" #'kill-buffer-and-window)
-(keymap-set adh-window-keymap "d" #'windower-toggle-single)
+(keymap-set adh-window-keymap "d" #'adh-delete-other-windows)
 (keymap-set adh-window-keymap "c" #'delete-window)
 (keymap-set adh-window-keymap "b" #'delete-other-windows-vertically)
 (keymap-set adh-window-keymap "n" #'balance-windows)

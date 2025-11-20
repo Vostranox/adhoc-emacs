@@ -198,11 +198,13 @@
 
 (defun adh-delete-other-windows ()
   (interactive)
-  (let ((buffer-name (buffer-name)))
-    (while (window-parameter (selected-window) 'window-side)
-      (other-window 1))
-    (delete-other-windows-internal)
-    (switch-to-buffer buffer-name)))
+  (let ((buf (current-buffer)))
+    (if (window-parameter nil 'window-side)
+        (progn
+          (window-toggle-side-windows)
+          (delete-other-windows-internal)
+          (switch-to-buffer buf))
+      (delete-other-windows-internal))))
 
 (defun adh-backward-delete-char-dwim ()
   (interactive)
