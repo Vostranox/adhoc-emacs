@@ -68,7 +68,7 @@
                                   'font-lock-variable-name-face))))
           tabs
           " ")
-         ")")))))
+         ") ")))))
 
 (setq-default mode-line-format
               `("%e"
