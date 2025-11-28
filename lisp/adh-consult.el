@@ -65,6 +65,12 @@
   (let ((consult-preview-key 'any))
     (consult-goto-line)))
 
+(defun adh-consult-locate (&optional i)
+  (interactive)
+  (if (use-region-p)
+      (consult-locate (buffer-substring-no-properties (region-beginning) (region-end)))
+    (consult-locate)))
+
 (defun adh-consult-select-window ()
   (interactive)
   (require 'consult)

@@ -120,7 +120,7 @@
 (keymap-set adh-find-keymap "h" #'adh-consult-fd-project)
 (keymap-set adh-find-keymap "a" #'adh-consult-fd-directories-project)
 (keymap-set adh-find-keymap "e" #'adh-consult-fd-all)
-(keymap-set adh-find-keymap "p" #'consult-locate)
+(keymap-set adh-find-keymap "p" #'adh-consult-locate)
 ;; adh-find-keymap to adh-leader-map
 (keymap-set adh-leader-map "s" adh-find-keymap)
 
