@@ -432,7 +432,7 @@
   (keymap-set dired-mode-map "h" #'dired-up-directory)
   (keymap-set dired-mode-map "i" #'dired-find-file)
   (keymap-set dired-mode-map "C-o" #'zoxide-travel)
-  (keymap-set dired-mode-map "C-," #'adh-dired-duplicate-file)
+  (keymap-set dired-mode-map "C-," #'adh-dired-duplicate-dwim)
   (keymap-set dired-mode-map "M-a" #'dired-toggle-read-only)
   (keymap-set dired-mode-map "<backspace>" #'dired-display-file)
   (keymap-set dired-mode-map "<return>" #'dired-find-file-other-window))

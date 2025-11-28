@@ -9,19 +9,26 @@
 
 (defun adh--apply-font (family height &optional frame)
   (with-selected-frame (or frame (selected-frame))
-    (when (and (display-graphic-p)
-               (find-font (font-spec :family family)))
-      (set-face-attribute 'default nil :family family :height height) t)))
+    (if (and (display-graphic-p)
+             (find-font (font-spec :family family)))
+        (progn
+          (set-face-attribute 'default nil :family family :height height)
+          t)
+      nil)))
 
 (defun adh-set-font (family height)
   (when adh--font-hook (remove-hook 'after-make-frame-functions adh--font-hook))
-  (setq adh--font-hook (lambda (frame) (adh--apply-font family height frame)))
+  (setq adh--font-hook
+        (lambda (frame)
+          (unless (adh--apply-font family height frame)
+            (when (display-graphic-p frame)
+              (message "[adh] Warning: Queued font '%s' not found." family)))))
   (add-hook 'after-make-frame-functions adh--font-hook)
   (if (adh--apply-font family height (selected-frame))
-      (message "[adh] Set font \"%s\"" family)
+      (message "[adh] Set font '%s'" family)
     (if (display-graphic-p)
-        (message "[adh] Font not found: %s" family)
-      (message "[adh] Queued font \"%s\"" family))))
+        (message "[adh] Font not found: '%s'" family)
+      (message "[adh] Queued font '%s'" family))))
 
 (use-package emacs
   :ensure nil
