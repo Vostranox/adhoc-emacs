@@ -33,7 +33,9 @@
 (defun adh-add-to-path (path)
   (let ((expanded-path (expand-file-name path)))
     (add-to-list 'exec-path expanded-path)
-    (setenv "PATH" (concat expanded-path path-separator (getenv "PATH")))))
+    (let ((current-path-list (split-string (getenv "PATH") path-separator)))
+      (unless (member expanded-path current-path-list)
+        (setenv "PATH" (concat expanded-path path-separator (getenv "PATH")))))))
 
 (use-package emacs
   :ensure nil

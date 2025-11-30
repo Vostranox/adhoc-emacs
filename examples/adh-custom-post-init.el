@@ -5,6 +5,7 @@
 (set-frame-parameter nil 'undecorated t)
 
 (when (eq system-type 'windows-nt)
-  (add-to-list 'exec-path "C:/Program Files/Git/usr/bin")
+  (adh-add-to-path "C:/Program Files/Git/bin")
+  (adh-add-to-path "C:/Program Files/Git/usr/bin")
   (with-eval-after-load 'magit
     (setq magit-git-executable "C:/Program Files/Git/bin/git.exe")))
