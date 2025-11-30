@@ -30,6 +30,11 @@
         (message "[adh] Font not found: '%s'" family)
       (message "[adh] Queued font '%s'" family))))
 
+(defun adh-add-to-path (path)
+  (let ((expanded-path (expand-file-name path)))
+    (add-to-list 'exec-path expanded-path)
+    (setenv "PATH" (concat expanded-path path-separator (getenv "PATH")))))
+
 (use-package emacs
   :ensure nil
   :init
@@ -155,9 +160,9 @@
                             " — GNU Emacs")
                   (concat "%b — GNU Emacs"))))
 
-  (if (fboundp 'adh-set-font)
-      (adh-set-font adh-mono-spaced-font adh-mono-spaced-font-size)
-    (message "[adh] adh-set-font not found"))
+  (adh-set-font adh-mono-spaced-font adh-mono-spaced-font-size)
+
+  (adh-add-to-path "~/bin")
 
   (setq display-buffer-alist
         `((adh--sidewin-target-p
