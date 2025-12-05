@@ -233,8 +233,7 @@
                        (not (string-prefix-p " " name)))
                    (string-match-p regexp name))
           (when (kill-buffer buf)
-            (setq count (1+ count))))))
-    (message "Killed %d matching buffer(s)." count)))
+            (setq count (1+ count))))))))
 
 (defun adh-compile-region (start end)
   (interactive "r")

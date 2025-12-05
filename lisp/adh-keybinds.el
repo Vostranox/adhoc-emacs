@@ -94,7 +94,7 @@
 (keymap-set adh-command-map "u" #'mc/insert-numbers)
 
 (keymap-set adh-command-map "a" #'adh-tmux-cd)
-(keymap-set adh-command-map "r" #'adh-wrap-region-with-pair)
+(keymap-set adh-command-map "C-r" #'adh-wrap-region-with-pair)
 (keymap-set adh-command-map "C-u" #'vundo)
 (keymap-set adh-command-map "C-h" #'help-command)
 
