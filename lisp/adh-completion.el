@@ -1,12 +1,9 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
 (defun adh-set-completion-backend (backend)
-  (interactive
-   (list (intern (completing-read "Select backend: " '(company corfu)))))
-  (cond ((eq backend 'company)
-         (global-corfu-mode 0))
-        ((eq backend 'corfu)
-         (global-company-mode 0)))
+  (interactive (list (intern (completing-read "Select backend: " '(company corfu)))))
+  (when (bound-and-true-p global-corfu-mode) (global-corfu-mode 0))
+  (when (bound-and-true-p global-company-mode) (global-company-mode 0))
   (setq adh-completion-backend backend)
   (message "[adh] Completion backend set to %s" backend))
 

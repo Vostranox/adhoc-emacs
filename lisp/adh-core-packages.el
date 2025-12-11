@@ -6,9 +6,7 @@
         (deactivate-mark)
         (isearch-mode forward)
         (isearch-yank-string search-string))
-    (if forward
-        (call-interactively #'isearch-forward)
-      (call-interactively #'isearch-backward))))
+    (call-interactively (if forward #'isearch-forward #'isearch-backward))))
 
 (defun adh-isearch-forward-with-region ()
   (interactive)

@@ -14,9 +14,8 @@
 (defun adh--eglot-global-disable ()
   (add-to-list 'eglot-stay-out-of 'flymake)
   (when (bound-and-true-p flymake-mode) (flymake-mode 0))
-  (when (bound-and-true-p eldoc-mode)   (eldoc-mode 0))
-  (when (fboundp 'yas-minor-mode)
-    (when (bound-and-true-p yas-minor-mode) (yas-minor-mode 0)))
+  (when (bound-and-true-p eldoc-mode) (eldoc-mode 0))
+  (when (bound-and-true-p yas-minor-mode) (yas-minor-mode 0))
   (setq adh--eglot-format-on-save-enabled nil)
   (remove-hook 'before-save-hook #'adh-eglot-format-buffer)
   (setq adh--eglot-global-enabled nil)
@@ -35,10 +34,12 @@
              (eglot-server-capable :documentFormattingProvider))
     (eglot-format-buffer)
     (when (eq system-type 'windows-nt)
-      (save-excursion
-        (goto-char (point-min))
-        (while (search-forward "\r" nil t)
-          (replace-match ""))))))
+      (let ((eol-type (coding-system-eol-type buffer-file-coding-system)))
+        (when (eq eol-type 0)
+          (save-excursion
+            (goto-char (point-min))
+            (while (search-forward "\r" nil t)
+              (replace-match ""))))))))
 
 (defun adh-eglot-enable-format-on-save ()
   (interactive)
