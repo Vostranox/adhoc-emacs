@@ -119,12 +119,12 @@
     (add-to-list 'exec-path "C:/Program Files/Everything")
     (setq consult-locate-args '("es.exe" "-s" "-full-path-and-name")))
 
-  (consult-customize consult--source-buffer :name "λ" :hidden nil :narrow ?r
-                     consult--source-recent-file :name "λ" :hidden t :narrow ?r
-                     consult--source-hidden-buffer :name "◆" :hidden t :default nil :narrow ?\s
-                     consult--source-buffer-register :hidden t :default nil :narrow nil
-                     consult--source-file-register :hidden t :default nil :narrow nil
-                     consult--source-bookmark :hidden t :default nil :narrow nil)
+  (consult-customize consult-source-buffer :name "λ" :hidden nil :narrow ?r
+                     consult-source-recent-file :name "λ" :hidden t :narrow ?r
+                     consult-source-hidden-buffer :name "◆" :hidden t :default nil :narrow ?\s
+                     consult-source-buffer-register :hidden t :default nil :narrow nil
+                     consult-source-file-register :hidden t :default nil :narrow nil
+                     consult-source-bookmark :hidden t :default nil :narrow nil)
 
   (define-advice consult-narrow (:around (orig-fun &rest args) adh--consult-overlay)
     (prog1 (apply orig-fun args)
