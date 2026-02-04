@@ -9,7 +9,7 @@
          (file-regular-p (file-name-concat d ".project"))))))
 
 (defun adh--project-try (&optional dir)
-  (when-let ((root (adh--get-project-dir dir)))
+  (when-let* ((root (adh--get-project-dir dir)))
     (cons 'transient (expand-file-name root))))
 
 (defun adh-project-compile ()

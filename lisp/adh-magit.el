@@ -29,7 +29,7 @@
 (defun adh-magit-staging-quick ()
   (interactive)
   (require 'magit)
-  (if-let ((buffer
+  (if-let* ((buffer
             (and (not current-prefix-arg)
                  (not (magit-get-mode-buffer 'magit-staging-mode nil 'selected))
                  (magit-get-mode-buffer 'magit-staging-mode))))
@@ -74,7 +74,7 @@
 (defun adh-magit-blame-copy-short-hash ()
   (interactive)
   (magit-blame-copy-hash)
-  (when-let ((last (current-kill 0)))
+  (when-let* ((last (current-kill 0)))
     (kill-new (substring last 0 7))
     (message "%s" (substring last 0 7))))
 

@@ -1,7 +1,7 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
 (defun adh--rename-mode (mode name)
-  (when-let ((entry (assq mode minor-mode-alist)))
+  (when-let* ((entry (assq mode minor-mode-alist)))
     (setcdr entry (list name))))
 
 (defun adh--move-lines (n)
