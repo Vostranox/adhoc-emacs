@@ -102,6 +102,7 @@
 
 ;; adh-leader-map keys
 (keymap-set adh-leader-map "l" #'tab-switch)
+(keymap-set adh-leader-map "d" #'adh-consult-select-window)
 (keymap-set adh-leader-map "c" #'consult-buffer)
 (keymap-set adh-leader-map "b" #'consult-bookmark)
 (keymap-set adh-leader-map "x" #'adh-toggle-meow-normal-mode)
