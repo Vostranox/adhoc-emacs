@@ -16,6 +16,12 @@
           t)
       nil)))
 
+(defun adh--create-parent-dir-on-the-fly ()
+  (let ((dir (file-name-directory buffer-file-name)))
+    (when (and dir (not (file-exists-p dir)))
+      (make-directory dir t)))
+  nil)
+
 (defun adh-set-font (family height)
   (when adh--font-hook (remove-hook 'after-make-frame-functions adh--font-hook))
   (setq adh--font-hook
@@ -135,13 +141,6 @@
   (setq-default case-fold-search t
                 indent-tabs-mode nil
                 tab-width 4)
-
-  (define-advice find-file (:before (filename &optional _) adh--make-dir)
-    (unless (file-exists-p filename)
-      (let ((dir (file-name-directory filename)))
-        (unless (file-exists-p dir)
-          (make-directory dir t)))))
-
   (set-language-environment "UTF-8")
   (prefer-coding-system 'utf-8-unix)
   (set-default-coding-systems 'utf-8-unix)
@@ -174,6 +173,8 @@
            (window-parameters . ((no-other-window . t)))
            (body-function . select-window))))
 
+  (setq-default truncate-lines t)
+
   (advice-add #'treesit-forward-sexp :override #'forward-sexp-default-function)
 
   (delete-selection-mode 1)
@@ -186,6 +187,7 @@
   (winner-mode 1)
   :hook
   (emacs-startup . (lambda () (tab-bar-rename-tab "dev") (message "[adh] Activated %d packages in %s" (length package-activated-list) (emacs-init-time))))
+  (find-file-not-found-functions . adh--create-parent-dir-on-the-fly)
   (text-mode . visual-line-mode)
   (before-save . delete-trailing-whitespace))
 

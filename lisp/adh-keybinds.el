@@ -6,65 +6,76 @@
 ;; global-map
 (keymap-set global-map "<backspace>" #'adh-backward-delete-char-dwim)
 
+;; C
 (keymap-set global-map "C-f" #'adh-complete-at-point)
 (keymap-set global-map "C-o" #'zoxide-travel)
 (keymap-set global-map "C-u" #'clipboard-yank)
-(keymap-set global-map "C-S-u" #'consult-yank-pop)
-
 (keymap-set global-map "C-h" #'mark-word)
-(keymap-set global-map "C-S-h" #'mark-sexp)
 (keymap-set global-map "C-a" #'next-line)
 (keymap-set global-map "C-e" #'previous-line)
 (keymap-set global-map "C-i" #'indent-for-tab-command)
 (keymap-set global-map "C-S-i" #'tab-to-tab-stop)
-
 (keymap-set global-map "C-," #'adh-duplicate-dwim)
 (keymap-set global-map "C-." #'embark-act)
-
 (keymap-set global-map "C-l" #'recenter-top-bottom)
 (keymap-set global-map "C-d" #'other-window)
 (keymap-set global-map "C-b" #'adh-select-side-window)
-
 (keymap-set global-map "C-n" #'consult-isearch-history)
 (keymap-set global-map "C-r" #'adh-isearch-backward-with-region)
 (keymap-set global-map "C-t" #'adh-keyboard-quit-dwim)
 (keymap-set global-map "C-s" #'adh-isearch-forward-with-region)
 (keymap-set global-map "C-g" #'adh-keyboard-quit-dwim)
-
 (keymap-set global-map "C-+" #'global-text-scale-adjust)
 
-(keymap-set global-map "M-f" #'forward-word)
+;; M
 (keymap-set global-map "M-o" #'adh-project-switch-to-dired)
 (keymap-set global-map "M-u" #'indent-region)
-
 (keymap-set global-map "M-h" #'previous-buffer)
 (keymap-set global-map "M-a" #'adh-move-lines-down)
 (keymap-set global-map "M-e" #'adh-move-lines-up)
 (keymap-set global-map "M-i" #'next-buffer)
-
 (keymap-set global-map "M-," #'xref-go-back)
 (keymap-set global-map "M-." #'xref-find-definitions)
 (keymap-set global-map "M-/" #'xref-find-references)
 
-(keymap-set global-map "M-l" #'clipboard-kill-ring-save)
-(keymap-set global-map "M-d" #'kill-word)
-(keymap-set global-map "M-b" #'backward-word)
-
-(keymap-set global-map "M-n" #'set-mark-command)
-(keymap-set global-map "M-r" #'consult-register-store)
-(keymap-set global-map "M-t" #'consult-register-load)
-(keymap-set global-map "M-s" #'avy-goto-char-timer)
-
-(keymap-set global-map "M-m" #'transpose-chars)
-(keymap-set global-map "M-w" #'transpose-words)
-
-(keymap-set global-map "M-<delete>" #'backward-kill-word)
-
+;; C-M
 (keymap-set global-map "C-M-f" #'downcase-dwim)
 (keymap-set global-map "C-M-o" #'capitalize-dwim)
+(keymap-set global-map "C-M-h" #'tab-previous)
+(keymap-set global-map "C-M-i" #'tab-next)
 (keymap-set global-map "C-M-u" #'upcase-dwim)
 (keymap-set global-map "C-M-s" #'vr/isearch-forward)
 (keymap-set global-map "C-M-r" #'vr/isearch-backward)
+(keymap-set global-map "C-M-." #'adh-apropos)
+
+;; C-c prefix
+(keymap-set global-map "C-c f" #'mc/edit-beginnings-of-lines)
+(keymap-set global-map "C-c o" #'mc/mark-all-dwim)
+(keymap-set global-map "C-c u" #'mc/insert-numbers)
+(keymap-set global-map "C-c a" #'adh-tmux-cd)
+(keymap-set global-map "C-c C-r" #'adh-wrap-region-with-pair)
+(keymap-set global-map "C-c C-u" #'vundo)
+(keymap-set global-map "C-c C-h" #'help-command)
+
+; Toggles
+(keymap-set global-map "C-c C-t f" #'adh-toggle-eglot-flymake)
+(keymap-set global-map "C-c C-t o" #'flymake-show-buffer-diagnostics)
+(keymap-set global-map "C-c C-t h" #'adh-toggle-cmp-auto)
+(keymap-set global-map "C-c C-t a" #'adh-toggle-eglot-global)
+(keymap-set global-map "C-c C-t e" #'adh-toggle-eglot-format-on-save)
+(keymap-set global-map "C-c C-t i" #'adh-subword-toggle)
+(keymap-set global-map "C-c C-t /" #'adh-toggle-func-case-at-point)
+
+;; C-x prefix
+(keymap-set global-map "C-x j" (=> (find-file (adh--get-project-dir))))
+(keymap-set global-map "C-x C-j"  #'dired-jump)
+(keymap-set global-map "C-x f" #'find-file-at-point)
+(keymap-set global-map "C-x C-f" #'find-file)
+(keymap-set global-map "C-x RET f" #'set-buffer-file-coding-system)
+(keymap-set global-map "C-x RET o" #'adh-show-buffer-file-encoding)
+(keymap-set global-map "C-x ," #'next-error)
+(keymap-set global-map "C-x ." #'previous-error)
+(keymap-set global-map "C-x C-w" #'write-file)
 
 ;; minibuffer-local-map
 (keymap-set minibuffer-local-map "<backspace>" #'adh-backward-delete-char-dwim)
@@ -85,32 +96,17 @@
 (keymap-set completion-in-region-mode-map "<return>" #'minibuffer-choose-completion)
 (keymap-set completion-in-region-mode-map "<tab>" #'minibuffer-choose-completion)
 
-;; adh-command-map
-(defvar-keymap adh-command-map)
-(keymap-set global-map "C-c" adh-command-map)
-
-(keymap-set adh-command-map "f" #'mc/edit-beginnings-of-lines)
-(keymap-set adh-command-map "o" #'mc/mark-all-dwim)
-(keymap-set adh-command-map "u" #'mc/insert-numbers)
-
-(keymap-set adh-command-map "a" #'adh-tmux-cd)
-(keymap-set adh-command-map "C-r" #'adh-wrap-region-with-pair)
-(keymap-set adh-command-map "C-u" #'vundo)
-(keymap-set adh-command-map "C-h" #'help-command)
-
-;; C-x map
-(keymap-set global-map "C-x j" (=> (find-file (adh--get-project-dir))))
-(keymap-set global-map "C-x C-j"  #'dired-jump)
-(keymap-set global-map "C-x f" #'find-file-at-point)
-(keymap-set global-map "C-x C-f" #'find-file)
-(keymap-set global-map "C-x RET f" #'set-buffer-file-coding-system)
-(keymap-set global-map "C-x RET o" #'adh-show-buffer-file-encoding)
-(keymap-set global-map "C-x ," #'next-error)
-(keymap-set global-map "C-x ." #'previous-error)
-
 ;; leader map
 (defvar-keymap adh-leader-map)
 (keymap-set global-map "C-x a" adh-leader-map)
+
+;; adh-leader-map keys
+(keymap-set adh-leader-map "l" #'tab-switch)
+(keymap-set adh-leader-map "c" #'consult-buffer)
+(keymap-set adh-leader-map "b" #'consult-bookmark)
+(keymap-set adh-leader-map "x" #'adh-toggle-meow-normal-mode)
+(keymap-set adh-leader-map "w" #'adh-dired-or-file)
+(keymap-set adh-leader-map "DEL" #'find-file)
 
 ;; adh-find-keymap
 (defvar-keymap adh-find-keymap)
@@ -153,8 +149,8 @@
 (keymap-set adh-compile-keymap "u" #'adh-compile-region)
 (keymap-set adh-compile-keymap "h" #'adh-project-compile)
 (keymap-set adh-compile-keymap "a" #'adh-project-async-shell-command)
-(keymap-set adh-compile-keymap "e" #'recompile)
-(keymap-set adh-compile-keymap "." #'adh-project-compile-region)
+(keymap-set adh-compile-keymap "e" #'adh-project-compile-region)
+(keymap-set adh-compile-keymap "," #'recompile)
 ;; adh-compile-keymap to adh-leader-map
 (keymap-set adh-leader-map "n" adh-compile-keymap)
 
@@ -171,8 +167,8 @@
 (keymap-set adh-magit-keymap "h" #'adh-magit-staging-quick)
 (keymap-set adh-magit-keymap "a" #'magit-log-current)
 (keymap-set adh-magit-keymap "e" #'magit-checkout)
-(keymap-set adh-magit-keymap "." #'magit-status-quick)
 (keymap-set adh-magit-keymap "," #'magit-git-command-topdir)
+(keymap-set adh-magit-keymap "." #'magit-status-quick)
 (keymap-set adh-magit-keymap "/" #'adh-magit-restore-current)
 ;; adh-magit-keymap to adh-leader-map
 (keymap-set adh-leader-map "m" adh-magit-keymap)
@@ -180,26 +176,12 @@
 ;; adh-file-keymap
 (defvar-keymap adh-file-keymap)
 ;; adh-file-keymap keys
-(keymap-set adh-file-keymap "d" #'rename-file)
-(keymap-set adh-file-keymap "c" #'write-file)
 (keymap-set adh-file-keymap "s" #'adh-copy-full-path)
 (keymap-set adh-file-keymap "t" #'adh-copy-path)
 (keymap-set adh-file-keymap "r" #'adh-copy-file-name)
 (keymap-set adh-file-keymap "x" #'ediff-files)
 ;; adh-file-keymap to adh-leader-map
 (keymap-set adh-leader-map "f" adh-file-keymap)
-
-;; adh-toggle-keymap
-(defvar-keymap adh-toggle-keymap)
-;; adh-toggle-keymap keys
-(keymap-set adh-toggle-keymap "l" #'adh-toggle-vc-mode)
-(keymap-set adh-toggle-keymap "d" #'flymake-show-buffer-diagnostics)
-(keymap-set adh-toggle-keymap "c" #'adh-toggle-cmp-auto)
-(keymap-set adh-toggle-keymap "r" #'adh-toggle-eglot-flymake)
-(keymap-set adh-toggle-keymap "t" #'adh-toggle-eglot-global)
-(keymap-set adh-toggle-keymap "s" #'adh-toggle-eglot-format-on-save)
-;; adh-toggle-keymap to adh-leader-map
-(keymap-set adh-leader-map "u" adh-toggle-keymap)
 
 ;; adh-window-keymap
 (defvar-keymap adh-window-keymap)
@@ -229,8 +211,6 @@
 (keymap-set adh-buffer-keymap "b" #'adh-kill-matching-buffers-no-ask-except-current)
 (keymap-set adh-buffer-keymap "n" #'align-regexp)
 (keymap-set adh-buffer-keymap "r" #'rename-buffer)
-(keymap-set adh-buffer-keymap "t" #'previous-buffer)
-(keymap-set adh-buffer-keymap "s" #'next-buffer)
 (keymap-set adh-buffer-keymap "g" #'revert-buffer)
 (keymap-set adh-buffer-keymap "x" #'ediff-buffers)
 (keymap-set adh-buffer-keymap "m" #'eval-buffer)
@@ -246,8 +226,6 @@
 (keymap-set adh-tab-keymap "d" #'tab-close-other)
 (keymap-set adh-tab-keymap "c" #'tab-close)
 (keymap-set adh-tab-keymap "r" #'tab-rename)
-(keymap-set adh-tab-keymap "t" #'tab-previous)
-(keymap-set adh-tab-keymap "s" #'tab-next)
 ;; adh-tab-keymap to adh-leader-map
 (keymap-set adh-leader-map "e" adh-tab-keymap)
 
@@ -259,18 +237,6 @@
 (keymap-set adh-bookmark-keymap "s" #'bookmark-set)
 ;; adh-bookmark-keymap to adh-leader-map
 (keymap-set adh-leader-map "i" adh-bookmark-keymap)
-
-;; adh-leader-map
-(defvar-keymap adh-leader-map)
-;; adh-leader-map keys
-(keymap-set adh-leader-map "l" #'tab-switch)
-(keymap-set adh-leader-map "d" #'adh-consult-select-window)
-(keymap-set adh-leader-map "c" #'consult-buffer)
-(keymap-set adh-leader-map "b" #'consult-bookmark)
-(keymap-set adh-leader-map "x" #'adh-toggle-meow-normal-mode)
-(keymap-set adh-leader-map "w" #'adh-dired-or-file)
-(keymap-set adh-leader-map "o" #'adh-select-side-window)
-(keymap-set adh-leader-map "DEL" #'find-file)
 
 ;; Meow
 (with-eval-after-load 'meow
@@ -422,6 +388,7 @@
 
 ;; Isearch
 (with-eval-after-load 'isearch
+  (keymap-set isearch-mode-map "M-a" #'adh-isearch-occur)
   (keymap-set isearch-mode-map "C-d" #'avy-isearch)
   (keymap-set isearch-mode-map "C-t" #'isearch-abort)
   (keymap-set isearch-mode-map "C-u" #'isearch-yank-x-selection))

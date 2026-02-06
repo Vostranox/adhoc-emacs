@@ -33,19 +33,13 @@
         (goto-char (+ new-start point-offset))))))
 
 (defun adh--insert-pair-around-region (open close)
+  (interactive)
   (when (use-region-p)
-    (let ((beg (region-beginning))
-          (end (region-end)))
-      (save-excursion
-        (goto-char end)
-        (insert close)
-        (goto-char beg)
-        (insert open)))))
+      (insert-pair 1 open close)))
 
 (defun adh--with-saved-window (fn)
-  (let ((win (selected-window)))
-    (call-interactively fn)
-    (select-window win)))
+  (save-selected-window
+    (call-interactively fn)))
 
 (defun adh--half-window-height ()
   (max 1 (/ (window-body-height) 2)))
@@ -73,7 +67,34 @@
          (not (derived-mode-p
                'magit-mode)))))
 
+(defun adh--snake-to-pascal (str)
+  (mapconcat #'capitalize
+             (split-string str "_" t)
+             ""))
+
+(defun adh--camel-to-snake (str)
+  (let ((case-fold-search nil))
+    (downcase
+     (replace-regexp-in-string
+      "\\([a-z0-9]\\)\\([A-Z]\\)"
+      "\\1_\\2"
+      str))))
+
+(defun adh--toggle-case-string (str)
+  (if (string-match-p "_" str)
+      (adh--snake-to-pascal str)
+    (adh--camel-to-snake str)))
+
 ;;;; Interactive
+(defun adh-apropos ()
+  (interactive)
+  (if (use-region-p)
+      (let ((search-term (buffer-substring-no-properties
+                          (region-beginning)
+                          (region-end))))
+        (apropos search-term))
+    (call-interactively 'apropos)))
+
 (defun adh-split-below-root ()
   (interactive)
   (split-window (frame-root-window) nil 'below))
@@ -394,6 +415,11 @@
   (select-window (get-buffer-window "*Completions*" t))
   (isearch-forward))
 
+(defun adh-isearch-occur ()
+  (interactive)
+  (call-interactively #'isearch-occur)
+  (isearch-done))
+
 (defun adh-show-buffer-file-encoding ()
   (interactive)
   (message "Buffer encoding: %s" buffer-file-coding-system))
@@ -411,5 +437,27 @@
 (defun adh-occur-goto-and-pop ()
   (interactive)
   (adh--with-saved-window #'occur-mode-goto-occurrence))
+
+(defun adh-subword-toggle ()
+  (interactive)
+  (glasses-mode 'toggle)
+  (subword-mode 'toggle))
+
+(defun adh-toggle-func-case-at-region (start end)
+  (interactive "r")
+  (atomic-change-group
+    (let* ((text (delete-and-extract-region start end))
+           (new-text (adh--toggle-case-string text)))
+      (insert new-text))))
+
+(defun adh-toggle-func-case-at-point ()
+  (interactive)
+  (let* ((bounds (if (use-region-p)
+                     (cons (region-beginning) (region-end))
+                   (bounds-of-thing-at-point 'symbol)))
+         (start (car bounds))
+         (end (cdr bounds)))
+    (when bounds
+      (adh-toggle-func-case-at-region start end))))
 
 (provide 'adh-functions)
