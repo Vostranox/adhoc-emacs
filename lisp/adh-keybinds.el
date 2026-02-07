@@ -151,7 +151,7 @@
 (keymap-set adh-compile-keymap "h" #'adh-project-compile)
 (keymap-set adh-compile-keymap "a" #'adh-project-async-shell-command)
 (keymap-set adh-compile-keymap "e" #'adh-project-compile-region)
-(keymap-set adh-compile-keymap "," #'recompile)
+(keymap-set adh-compile-keymap "." #'recompile)
 ;; adh-compile-keymap to adh-leader-map
 (keymap-set adh-leader-map "n" adh-compile-keymap)
 
