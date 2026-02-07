@@ -45,5 +45,5 @@ else
     emacs --batch --eval "(progn
       (require 'package)
       (package-refresh-contents)
-      (package-upgrade-all))"
+      (package-upgrade-all t))"
 fi
