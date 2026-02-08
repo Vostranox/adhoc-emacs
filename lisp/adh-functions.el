@@ -88,12 +88,12 @@
 ;;;; Interactive
 (defun adh-apropos ()
   (interactive)
-  (if (use-region-p)
-      (let ((search-term (buffer-substring-no-properties
-                          (region-beginning)
-                          (region-end))))
-        (apropos search-term))
-    (call-interactively 'apropos)))
+  (let ((search-term (if (use-region-p)
+                         (buffer-substring-no-properties (region-beginning) (region-end))
+                       (thing-at-point 'symbol t))))
+    (if search-term
+        (apropos search-term)
+      (call-interactively 'apropos))))
 
 (defun adh-split-below-root ()
   (interactive)
