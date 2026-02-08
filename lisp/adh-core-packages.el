@@ -32,6 +32,13 @@
       (adh-disable-vc)
     (adh-enable-vc)))
 
+(use-package treesit
+  :ensure nil
+  :custom
+  (treesit-font-lock-level 4)
+  :config
+  (advice-add #'treesit-forward-sexp :override #'forward-sexp-default-function))
+
 (use-package isearch
   :ensure nil
   :custom
@@ -86,6 +93,26 @@
   :hook
   (org-mode-hook . org-indent-mode))
 
+(use-package bookmark
+  :init
+  (setq bookmark-default-file (no-littering-expand-var-file-name "bookmarks")))
+
+(use-package savehist
+  :init
+  (setq savehist-file (no-littering-expand-var-file-name "history"))
+  :config
+  (savehist-mode 1))
+
+(use-package recentf
+  :init
+  (setq recentf-save-file (no-littering-expand-var-file-name "recentf"))
+  :custom
+  (recentf-exclude '("/tmp"))
+  (recentf-max-menu-items 10)
+  (recentf-max-saved-items 5000)
+  :config
+  (recentf-mode 1))
+
 (use-package eldoc
   :ensure nil :defer t
   :config
@@ -101,6 +128,12 @@
   :config
   (defvar adh--vc-enabled nil)
   (add-to-list 'minor-mode-alist '(adh--vc-enabled adh--vc-mode-line-name)))
+
+(use-package transient
+  :init
+  (setq transient-history-file (no-littering-expand-var-file-name "transient/history.el")
+        transient-levels-file (no-littering-expand-var-file-name "transient/levels.el")
+        transient-values-file (no-littering-expand-var-file-name "transient/values.el")))
 
 (use-package ediff
   :ensure nil :defer t

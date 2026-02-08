@@ -8,4 +8,11 @@
   (setq package-native-compile t)
   (setq native-comp-async-report-warnings-errors 'silent))
 
+(when (fboundp 'startup-redirect-eln-cache)
+  (startup-redirect-eln-cache
+   (expand-file-name "var/eln-cache/" user-emacs-directory)))
+
+(use-package no-littering
+  :ensure t)
+
 (provide 'adh-use-package-bootstrap)

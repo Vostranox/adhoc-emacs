@@ -24,16 +24,6 @@
   (avy-background t)
   (avy-keys '(?n ?r ?t ?s ?g ?y ?h ?a ?e ?i ?l ?d ?c ?f ?o ?u)))
 
-(use-package yasnippet
-  :ensure t :defer t
-  :init
-  (setq yas-verbosity 0)
-  :commands (yas-minor-mode yas-global-mode)
-  :config
-  (yas-reload-all))
-
-(use-package yasnippet-snippets :ensure t :after yasnippet)
-
 (use-package visual-regexp
   :ensure t :defer t
   :custom

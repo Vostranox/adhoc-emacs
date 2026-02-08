@@ -46,10 +46,7 @@
 (use-package emacs
   :ensure nil
   :init
-  (defconst adh--var-dir (locate-user-emacs-file "var/"))
-  (make-directory adh--var-dir t)
-
-  (setq custom-file (expand-file-name "custom.el" adh--var-dir))
+  (setq custom-file (no-littering-expand-etc-file-name "custom.el"))
   (load custom-file t)
 
   (setq create-lockfiles nil
@@ -57,28 +54,19 @@
         auto-save-default nil
         auto-save-no-message t
         auto-save-file-name-transforms
-        `((".*" ,(expand-file-name "autosaves" adh--var-dir) t))
+        `((".*" ,(no-littering-expand-var-file-name "autosaves/") t))
         auto-save-list-file-prefix
-        (expand-file-name "autosaves/.saves-" adh--var-dir)
+        (no-littering-expand-var-file-name "autosaves/.saves-")
         make-backup-files nil
         backup-directory-alist
-        `(("." . ,(expand-file-name "backup" adh--var-dir)))
+        `(("." . ,(no-littering-expand-var-file-name "backup/")))
         delete-old-versions t
         kept-new-versions 6
         kept-old-versions 2
         version-control t)
 
-  (setq bookmark-default-file (expand-file-name "bookmarks" adh--var-dir)
-        project-list-file (expand-file-name "projects" adh--var-dir)
-        recentf-save-file (expand-file-name "recentf" adh--var-dir)
-        savehist-file (expand-file-name "history" adh--var-dir)
-        abbrev-file-name (expand-file-name "abbrev_defs" adh--var-dir)
-        transient-history-file (expand-file-name "transient/history.el" adh--var-dir)
-        transient-levels-file  (expand-file-name "transient/levels.el" adh--var-dir)
-        transient-values-file  (expand-file-name "transient/values.el" adh--var-dir))
-  (when (boundp 'native-comp-eln-load-path)
-    (setq native-comp-eln-load-path
-          (list (expand-file-name "eln-cache/" adh--var-dir))))
+  (setq-default abbrev-file-name (no-littering-expand-etc-file-name "abbrev_defs"))
+
   :custom
   (auto-revert-verbose nil)
   (auto-revert-remote-files nil)
@@ -89,8 +77,6 @@
   (c-ts-mode-indent-offset 4)
   (c-ts-mode-indent-style 'bsd)
   (go-ts-mode-indent-offset 4)
-
-  (treesit-font-lock-level 4)
 
   (compile-command "")
 
@@ -126,9 +112,6 @@
   (read-file-name-completion-ignore-case t)
 
   (history-length 5000)
-  (recentf-exclude '("/tmp"))
-  (recentf-max-menu-items 10)
-  (recentf-max-saved-items 5000)
 
   (tab-bar-show nil)
   (tab-bar-new-tab-choice "*scratch*")
@@ -175,15 +158,11 @@
 
   (setq-default truncate-lines t)
 
-  (advice-add #'treesit-forward-sexp :override #'forward-sexp-default-function)
-
   (delete-selection-mode 1)
   (global-display-line-numbers-mode 1)
   (global-hl-line-mode 1)
   (global-whitespace-mode 1)
   (minibuffer-depth-indicate-mode 1)
-  (recentf-mode 1)
-  (savehist-mode 1)
   (winner-mode 1)
   :hook
   (emacs-startup . (lambda () (tab-bar-rename-tab "dev") (message "[adh] Activated %d packages in %s" (length package-activated-list) (emacs-init-time))))
