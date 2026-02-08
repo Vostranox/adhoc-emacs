@@ -13,6 +13,6 @@
    (expand-file-name "var/eln-cache/" user-emacs-directory)))
 
 (use-package no-littering
-  :ensure t)
+  :ensure t :demand t)
 
 (provide 'adh-use-package-bootstrap)
