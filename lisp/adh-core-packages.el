@@ -107,7 +107,7 @@
   :init
   (setq recentf-save-file (no-littering-expand-var-file-name "recentf"))
   :custom
-  (recentf-exclude '("/tmp"))
+  (recentf-exclude '("^/tmp"))
   (recentf-max-menu-items 10)
   (recentf-max-saved-items 5000)
   :config
