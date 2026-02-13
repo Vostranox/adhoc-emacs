@@ -156,7 +156,7 @@
            (window-parameters . ((no-other-window . t)))
            (body-function . select-window))))
 
-  (setq-default truncate-lines t)
+  (setq-default truncate-lines nil)
 
   (delete-selection-mode 1)
   (global-display-line-numbers-mode 1)
