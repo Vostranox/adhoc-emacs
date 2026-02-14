@@ -41,8 +41,6 @@
 ;; C-M
 (keymap-set global-map "C-M-f" #'downcase-dwim)
 (keymap-set global-map "C-M-o" #'capitalize-dwim)
-(keymap-set global-map "C-M-h" #'tab-previous)
-(keymap-set global-map "C-M-i" #'tab-next)
 (keymap-set global-map "C-M-u" #'upcase-dwim)
 (keymap-set global-map "C-M-s" #'vr/isearch-forward)
 (keymap-set global-map "C-M-r" #'vr/isearch-backward)
@@ -158,7 +156,6 @@
 ;; adh-magit-keymap
 (defvar-keymap adh-magit-keymap)
 ;; adh-magit-keymap keys
-(keymap-set adh-magit-keymap "c" #'adh-magit-switch-or-status)
 (keymap-set adh-magit-keymap "m" #'magit)
 (keymap-set adh-magit-keymap "j" #'magit-file-dispatch)
 (keymap-set adh-magit-keymap "f" #'adh-toggle-magit-blame)
@@ -168,6 +165,7 @@
 (keymap-set adh-magit-keymap "h" #'adh-magit-staging-quick)
 (keymap-set adh-magit-keymap "a" #'magit-log-current)
 (keymap-set adh-magit-keymap "e" #'magit-checkout)
+(keymap-set adh-magit-keymap "i" #'adh-magit-switch-or-status)
 (keymap-set adh-magit-keymap "," #'magit-git-command-topdir)
 (keymap-set adh-magit-keymap "." #'magit-status-quick)
 (keymap-set adh-magit-keymap "/" #'adh-magit-restore-current)
