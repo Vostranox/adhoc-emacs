@@ -1,5 +1,10 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(defun adh--rename-isearch-occur-buffer (&rest _)
+  (when (get-buffer "*Occur*")
+    (with-current-buffer "*Occur*"
+      (rename-buffer (format "*s-occur: %s*" isearch-string) t))))
+
 (defun adh--isearch-with-region (forward)
   (if (use-region-p)
       (let ((search-string (buffer-substring-no-properties (region-beginning) (region-end))))
@@ -46,7 +51,9 @@
   (isearch-case-fold-search t)
   (search-whitespace-regexp ".*?")
   (lazy-count-prefix-format "(%s/%s) ")
-  (lazy-count-suffix-format nil))
+  (lazy-count-suffix-format nil)
+  :config
+  (advice-add 'isearch-occur :after #'adh--rename-isearch-occur-buffer))
 
 (use-package dired
   :ensure nil
