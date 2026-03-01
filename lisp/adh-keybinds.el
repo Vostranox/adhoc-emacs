@@ -46,7 +46,7 @@
 (keymap-set global-map "C-M-u" #'upcase-dwim)
 (keymap-set global-map "C-M-." #'adh-apropos)
 
-;; C-c prefix
+;; C-c
 (keymap-set global-map "C-c f" #'mc/edit-beginnings-of-lines)
 (keymap-set global-map "C-c o" #'mc/mark-all-dwim)
 (keymap-set global-map "C-c u" #'mc/insert-numbers)
@@ -55,7 +55,7 @@
 (keymap-set global-map "C-c C-u" #'vundo)
 (keymap-set global-map "C-c C-h" #'help-command)
 
-; Toggles
+; C-c C-t
 (keymap-set global-map "C-c C-t f" #'adh-toggle-eglot-flymake)
 (keymap-set global-map "C-c C-t o" #'flymake-show-buffer-diagnostics)
 (keymap-set global-map "C-c C-t h" #'adh-toggle-cmp-auto)
@@ -64,7 +64,7 @@
 (keymap-set global-map "C-c C-t i" #'adh-subword-toggle)
 (keymap-set global-map "C-c C-t /" #'adh-toggle-func-case-at-point)
 
-;; C-x prefix
+;; C-x
 (keymap-set global-map "C-x j" (=> (find-file (adh--get-project-dir))))
 (keymap-set global-map "C-x C-j"  #'dired-jump)
 (keymap-set global-map "C-x f" #'find-file-at-point)
@@ -96,7 +96,7 @@
 
 ;; leader map
 (defvar-keymap adh-leader-map)
-(keymap-set global-map "C-x a" adh-leader-map)
+(keymap-set global-map "C-x C-o" adh-leader-map)
 
 ;; adh-leader-map keys
 (keymap-set adh-leader-map "l" #'tab-switch)
@@ -259,7 +259,7 @@
   (add-hook 'minibuffer-setup-hook #'adh--meow-minibuffer-setup)
 
   ;; Normal mode
-  (keymap-set global-map "C-x t" meow-normal-state-keymap)
+  (keymap-set global-map "C-x C-z" meow-normal-state-keymap)
 
   (meow-define-keys 'normal
     (cons "SPC" adh-leader-map)
