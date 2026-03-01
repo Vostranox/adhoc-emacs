@@ -22,8 +22,10 @@
 (keymap-set global-map "C-b" #'adh-select-side-window)
 (keymap-set global-map "C-n" #'consult-isearch-history)
 (keymap-set global-map "C-r" #'adh-isearch-backward-with-region)
+(keymap-set global-map "C-S-r" #'vr/isearch-backward)
 (keymap-set global-map "C-t" #'adh-keyboard-quit-dwim)
 (keymap-set global-map "C-s" #'adh-isearch-forward-with-region)
+(keymap-set global-map "C-S-s" #'vr/isearch-forward)
 (keymap-set global-map "C-g" #'adh-keyboard-quit-dwim)
 (keymap-set global-map "C-+" #'global-text-scale-adjust)
 
@@ -42,8 +44,6 @@
 (keymap-set global-map "C-M-f" #'downcase-dwim)
 (keymap-set global-map "C-M-o" #'capitalize-dwim)
 (keymap-set global-map "C-M-u" #'upcase-dwim)
-(keymap-set global-map "C-M-s" #'vr/isearch-forward)
-(keymap-set global-map "C-M-r" #'vr/isearch-backward)
 (keymap-set global-map "C-M-." #'adh-apropos)
 
 ;; C-c prefix
