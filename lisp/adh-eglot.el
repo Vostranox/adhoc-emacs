@@ -94,6 +94,7 @@
   (setq eglot-stay-out-of adh--eglot-stay-out-of)
   :config
   (add-to-list 'eglot-ignored-server-capabilities :documentOnTypeFormattingProvider)
+  (add-to-list 'eglot-server-programs '((c-ts-mode c++-ts-mode) . ("clangd" "--header-insertion=never")))
   :hook
   (eglot-managed-mode . (lambda () (eglot-inlay-hints-mode -1))))
 
