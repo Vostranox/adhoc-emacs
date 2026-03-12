@@ -12,3 +12,7 @@
   (adh-add-to-path "C:/Program Files/Git/usr/bin")
   (with-eval-after-load 'magit
     (setq magit-git-executable "C:/Program Files/Git/bin/git.exe")))
+
+(when (eq system-type 'darwin)
+  (adh-add-to-path "/opt/homebrew/bin/")
+  (setq insert-directory-program "gls"))
