@@ -94,9 +94,18 @@
 (use-package org
   :ensure nil
   :custom
+  (org-M-RET-may-split-line '((default . nil)))
+  (org-insert-heading-respect-content t)
   (org-startup-folded 'showeverything)
   (org-src-fontify-natively t)
   (org-indent-indentation-per-level 4)
+  (org-directory (expand-file-name "org-tasks" user-emacs-directory))
+  (org-agenda-files (list org-directory))
+  (org-log-done 'time)
+  (org-log-into-drawer t)
+  (org-deadline-warning-days 0)
+  (org-agenda-skip-deadline-if-done t)
+  (org-agenda-skip-deadline-prewarning-if-scheduled t)
   :hook
   (org-mode-hook . org-indent-mode))
 

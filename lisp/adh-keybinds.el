@@ -56,6 +56,8 @@
 (keymap-set global-map "C-c C-r" #'adh-wrap-region-with-pair)
 (keymap-set global-map "C-c C-u" #'vundo)
 (keymap-set global-map "C-c C-h" #'help-command)
+(keymap-set global-map "C-c A" #'consult-org-agenda)
+(keymap-set global-map "C-c E" #'org-agenda)
 
 ; C-c C-t
 (keymap-set global-map "C-c C-t f" #'adh-toggle-eglot-flymake)
@@ -65,6 +67,8 @@
 (keymap-set global-map "C-c C-t e" #'adh-toggle-eglot-format-on-save)
 (keymap-set global-map "C-c C-t i" #'adh-subword-toggle)
 (keymap-set global-map "C-c C-t /" #'adh-toggle-func-case-at-point)
+
+; C-c C-x
 
 ;; C-x
 (keymap-set global-map "C-x j" (=> (find-file (adh--get-project-dir))))
@@ -411,7 +415,12 @@
 
 ;; Org
 (with-eval-after-load 'org
-  (keymap-set org-mode-map "C-," #'adh-duplicate-dwim))
+  (keymap-set org-mode-map "C-," #'adh-duplicate-dwim)
+  (keymap-set org-mode-map "M-h" #'previous-buffer))
+
+;; Org agenda
+(with-eval-after-load 'org-agenda
+  (keymap-set org-agenda-mode-map "m" #'org-agenda-month-view))
 
 (with-eval-after-load 'xref
   (keymap-set xref--xref-buffer-mode-map "<backspace>" #'xref-show-location-at-point))
