@@ -100,6 +100,7 @@
   (org-src-fontify-natively t)
   (org-indent-indentation-per-level 4)
   (org-directory (expand-file-name "org-tasks" user-emacs-directory))
+  (org-capture-templates `(("t" "Todo" entry (file ,(expand-file-name "tasks.org" org-directory)) "* TODO %?  :%^g:")))
   (org-agenda-files (list org-directory))
   (org-log-done 'time)
   (org-log-into-drawer t)

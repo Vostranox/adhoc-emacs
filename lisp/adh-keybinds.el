@@ -56,8 +56,8 @@
 (keymap-set global-map "C-c C-r" #'adh-wrap-region-with-pair)
 (keymap-set global-map "C-c C-u" #'vundo)
 (keymap-set global-map "C-c C-h" #'help-command)
-(keymap-set global-map "C-c A" #'consult-org-agenda)
-(keymap-set global-map "C-c E" #'org-agenda)
+(keymap-set global-map "C-c A" #'org-agenda)
+(keymap-set global-map "C-c E" #'org-capture)
 
 ; C-c C-t
 (keymap-set global-map "C-c C-t f" #'adh-toggle-eglot-flymake)
