@@ -252,7 +252,7 @@
            ((meow-normal-mode-p) 'box)
            ((meow-insert-mode-p) 'bar)
            ((meow-motion-mode-p) 'box)
-           (t 'box))))
+           (t 'bar))))
 
   (defun adh--meow-minibuffer-setup ()
     (meow-insert-mode 1)
