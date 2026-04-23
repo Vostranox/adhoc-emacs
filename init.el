@@ -33,6 +33,12 @@
   :type '(choice (const :tag "Corfu" corfu)
                  (const :tag "Company" company)))
 
+(defcustom adh-undecorated-window t
+  "Set the window to undecorated at startup."
+  :group 'adhoc
+  :type '(choice (const :tag "Undecorated (No Title Bar)" t)
+                 (const :tag "Decorated (Standard)" nil)))
+
 (add-to-list 'load-path (locate-user-emacs-file "lisp"))
 
 (adh-load! "adh-custom-pre-init.el")

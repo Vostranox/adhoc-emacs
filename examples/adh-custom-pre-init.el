@@ -4,4 +4,5 @@
       '(("http"  . "proxy.example.com:8080")
         ("https" . "proxy.example.com:8080")))
 
+(setq adh-undecorated-window nil)
 (setq adh-completion-backend 'corfu)

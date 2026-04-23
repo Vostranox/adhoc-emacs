@@ -136,7 +136,11 @@
     (set-selection-coding-system 'utf-16-le)
     (setq default-process-coding-system '(utf-8-unix . utf-8-unix)))
 
-  (add-to-list 'default-frame-alist '(undecorated . t))
+  (add-to-list 'default-frame-alist '(fullscreen . maximized))
+  (when (eq system-type 'darwin)
+    (add-to-list 'default-frame-alist '(ns-transparent-titlebar . t)))
+  (add-to-list 'default-frame-alist `(undecorated . ,adh-undecorated-window))
+
   (setq frame-title-format
         '(:eval (if buffer-file-name
                     (concat (file-name-nondirectory buffer-file-name)

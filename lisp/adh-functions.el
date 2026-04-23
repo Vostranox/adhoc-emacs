@@ -217,6 +217,13 @@
           (switch-to-buffer buf))
       (delete-other-windows-internal))))
 
+(defun adh-toggle-window-decorations ()
+  (interactive)
+  (let ((new-state (not (frame-parameter nil 'undecorated))))
+    (set-frame-parameter nil 'undecorated new-state)
+    (setq adh-undecorated-window new-state)
+    (message "Window decorations %s" (if new-state "disabled" "enabled"))))
+
 (defun adh-backward-delete-char-dwim ()
   (interactive)
   (if (use-region-p)
