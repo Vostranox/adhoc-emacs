@@ -92,6 +92,8 @@
   :init
   (setq eglot-stay-out-of adh--eglot-stay-out-of)
   :config
+  (defconst adh--eglot-mode-line-name " lsp")
+  (add-to-list 'minor-mode-alist '(adh--eglot-global-enabled adh--eglot-mode-line-name))
   (add-to-list 'eglot-ignored-server-capabilities :documentOnTypeFormattingProvider)
   (add-to-list 'eglot-server-programs '((c-ts-mode c++-ts-mode) . ("clangd" "--header-insertion=never")))
   :hook

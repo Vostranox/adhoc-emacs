@@ -6,3 +6,6 @@
 
 (setq adh-undecorated-window nil)
 (setq adh-completion-backend 'corfu)
+
+(when (eq system-type 'windows-nt)
+  (setq default-directory (concat (getenv "USERPROFILE") "\\")))
