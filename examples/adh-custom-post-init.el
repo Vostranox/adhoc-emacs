@@ -16,3 +16,8 @@
 (when (eq system-type 'darwin)
   (adh-add-to-path "/opt/homebrew/bin/")
   (setq insert-directory-program "gls"))
+
+(define-derived-mode adh-glsl-ts-mode c++-ts-mode "adh-glsl-ts-mode")
+(add-to-list 'auto-mode-alist '("\\.glsl\\'" . adh-glsl-ts-mode))
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs '(adh-glsl-ts-mode . ("glsl_analyzer"))))
