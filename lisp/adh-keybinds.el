@@ -508,6 +508,7 @@ The remaining BODY is bindings as in `adh-keymap-set'."
     ("-" #'end-of-buffer)
     ("." #'previous-error-no-select)
     ("," #'next-error-no-select)
+    ("l" #'clipboard-kill-ring-save)
     ("C-o" #'recentf-open)
     ("M-o" #'zoxide-travel))
 
