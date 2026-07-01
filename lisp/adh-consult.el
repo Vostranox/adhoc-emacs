@@ -177,7 +177,8 @@
   "Calls jump-to-register"
   (interactive)
   (require 'consult)
-  (call-interactively #'jump-to-register))
+  (call-interactively #'jump-to-register)
+  (recenter))
 
 (use-package consult
   :ensure t
