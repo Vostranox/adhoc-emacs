@@ -20,7 +20,9 @@ THEMES_DIR="$EMACS_DIR/themes"
 SITE_LISP_DIR="$EMACS_DIR/site-lisp"
 
 clone_or_update() {
-    local url="$1" dir="$SITE_LISP_DIR/$(basename "$url" .git)"
+    local url="$1"
+    local dir
+    dir="$SITE_LISP_DIR/$(basename "$url" .git)"
     if [[ -d "$dir/.git" ]]; then
         git -C "$dir" pull --ff-only
     else
