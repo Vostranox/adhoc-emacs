@@ -5,7 +5,7 @@
   :custom
   (treesit-auto-install t)
   :config
-  (dolist (lang '(cmake glsl))
+  (dolist (lang '(cmake))
     (setq treesit-auto-langs (remove lang treesit-auto-langs)))
   (global-treesit-auto-mode 1))
 
@@ -24,9 +24,27 @@
   :hook
   (shader-mode . (lambda () (modify-syntax-entry ?_ "_"))))
 
+(use-package glsl-mode
+  :ensure t :defer t
+  :init
+  (with-eval-after-load 'c-ts-mode
+    (unless (fboundp 'c-ts-mode--simple-indent-rules)
+      (defun c-ts-mode--simple-indent-rules (mode style)
+        (let ((c-ts-mode-indent-style style))
+          (c-ts-mode--get-indent-style mode))))))
+
+(use-package slang-ts-mode
+  :ensure nil
+  :load-path "site-lisp/slang-ts-mode"
+  :mode ("\\.slang\\'" "\\.slangh\\'"))
+
+(use-package hlsl-ts-mode
+  :ensure nil
+  :load-path "site-lisp/hlsl-ts-mode"
+  :mode ("\\.hlsl\\'" "\\.hlsli\\'"))
+
 (use-package clang-format :ensure t :defer t)
 (use-package cmake-mode :ensure t :defer t)
-(use-package glsl-mode :ensure t :defer t)
 (use-package go-mode :ensure t :defer t)
 (use-package haskell-mode :ensure t :defer t)
 (use-package json-mode :ensure t :defer t)
