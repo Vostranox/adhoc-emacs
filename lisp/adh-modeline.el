@@ -23,11 +23,15 @@
                              (2 "/")
                              (_ "")))))))
 
+(defface adh-mode-line-buffer-id-inactive
+  '((t (:inherit shadow)))
+  "Face for the buffer name in mode lines of unselected windows.")
+
 (defun adh--mode-line-buffer-id ()
   "Return the buffer name segment, dimmed when its window is not selected."
   (let ((face (if (mode-line-window-selected-p)
                   'mode-line-buffer-id
-                'mode-line-buffer-id-inactive)))
+                'adh-mode-line-buffer-id-inactive)))
     (propertize "%b"
                 'face face
                 'mouse-face 'mode-line-highlight

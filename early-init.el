@@ -1,6 +1,7 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
 (add-to-list 'custom-theme-load-path (locate-user-emacs-file "themes/gruber-material-dark"))
+(add-to-list 'load-path (locate-user-emacs-file "themes/gruber-material-dark"))
 (condition-case err
     (load-theme 'gruber-material-dark-intense :no-confirm)
   (error (message "Failed to load theme: %s" (error-message-string err))))
