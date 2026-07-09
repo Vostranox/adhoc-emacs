@@ -256,7 +256,7 @@ The remaining BODY is bindings as in `adh-keymap-set'."
   ("T" #'adh-split-below-root)
   ("s" #'split-window-horizontally)
   ("S" #'adh-split-right-root)
-  ("w" #'windower-swap)
+  ("w" #'window-swap-states)
   ("m" #'window-toggle-side-windows)
   ("x" #'adh-to-side-window))
 

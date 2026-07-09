@@ -9,6 +9,32 @@
     (setq treesit-auto-langs (remove lang treesit-auto-langs)))
   (global-treesit-auto-mode 1))
 
+(use-package c-ts-mode
+  :ensure nil :defer t
+  :hook
+  (c-ts-mode . (lambda () (setq-local comment-start "// ") (setq-local comment-end ""))))
+
+(use-package rust-ts-mode
+  :ensure nil :defer t
+  :config
+  ;; Drop the rule that paints tree-sitter ERROR nodes red, so incomplete code
+  ;; while typing isn't a wall of error-face.
+  (setq rust-ts-mode--font-lock-settings
+        (cl-remove-if
+         (lambda (entry)
+           (eq (nth 2 entry) 'error))
+         rust-ts-mode--font-lock-settings)))
+
+(use-package zig-ts-mode
+  :ensure nil :defer t
+  :config
+  ;; Same as rust-ts-mode: don't paint tree-sitter ERROR nodes red.
+  (setq zig-ts--font-lock-settings
+        (cl-remove-if
+         (lambda (entry)
+           (eq (nth 2 entry) 'error))
+         zig-ts--font-lock-settings)))
+
 (use-package markdown-mode
   :ensure t :defer t
   :config
