@@ -52,4 +52,9 @@ Used by `adh--get-project-dir'; add entries with `adh-add-root-marker'."
   :group 'adhoc
   :type '(choice (const :tag "Current session" nil) string))
 
+(defcustom adh-treesit-excluded-langs '(cmake)
+  "Languages excluded from `treesit-auto' mode remapping."
+  :group 'adhoc
+  :type '(repeat symbol))
+
 (provide 'adh-vars)

@@ -99,10 +99,10 @@
   :config
   (defconst adh--eglot-mode-line-name " lsp")
   (add-to-list 'minor-mode-alist '(adh--eglot-global-enabled adh--eglot-mode-line-name))
+  (add-to-list 'eglot-ignored-server-capabilities :inlayHintProvider)
+  (add-to-list 'eglot-ignored-server-capabilities :semanticTokensProvider)
   (add-to-list 'eglot-ignored-server-capabilities :documentOnTypeFormattingProvider)
-  (adh-register-lsp-server '(c-ts-mode c++-ts-mode) "clangd" "--header-insertion=never")
-  :hook
-  (eglot-managed-mode . (lambda () (eglot-inlay-hints-mode -1))))
+  (adh-register-lsp-server '(c-ts-mode c++-ts-mode) "clangd" "--header-insertion=never"))
 
 (use-package flymake
   :ensure nil :defer t

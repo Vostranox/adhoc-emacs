@@ -51,9 +51,15 @@
 (defun adh--segment-eglot ()
   "Return the eglot status segment when the buffer is LSP-managed, else nil."
   (when (and (fboundp 'eglot-managed-p)
-             (eglot-managed-p)
-             (boundp 'eglot--mode-line-format))
-    (list "(" eglot--mode-line-format ")")))
+             (eglot-managed-p))
+    (cond
+     ((boundp 'eglot-mode-line-format)
+      (let ((parts (delete "" (mapcar #'format-mode-line
+                                      eglot-mode-line-format))))
+        (when parts
+          (list "(" (mapconcat #'identity parts " ") ")"))))
+     ((boundp 'eglot--mode-line-format)
+      (list "(" eglot--mode-line-format ")")))))
 
 (defun adh--segment-flymake ()
   "Return the flymake counters segment, or nil when empty or off."

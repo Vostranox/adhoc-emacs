@@ -5,7 +5,7 @@
   :custom
   (treesit-auto-install t)
   :config
-  (dolist (lang '(cmake))
+  (dolist (lang adh-treesit-excluded-langs)
     (setq treesit-auto-langs (remove lang treesit-auto-langs)))
   (global-treesit-auto-mode 1))
 

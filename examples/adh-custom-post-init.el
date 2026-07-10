@@ -15,7 +15,7 @@
 (when (eq system-type 'windows-nt)
   (adh-add-to-path "C:/Program Files/Git/bin")
   (adh-add-to-path "C:/Program Files/Git/usr/bin")
-  (setq insert-directory-program "C:/Program Files/Git/usr/bin/ls.exe"))
+  (setq insert-directory-program "C:/Program Files/Git/usr/bin/ls.exe")
   (with-eval-after-load 'magit
     (setq magit-git-executable "C:/Program Files/Git/bin/git.exe")))
 

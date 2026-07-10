@@ -14,5 +14,7 @@
 (setq adh-mono-spaced-font-size 90)
 (setq adh-mono-spaced-font "Iosevka Nerd Font Mono")
 
+(setq adh-treesit-excluded-langs '(cmake))
+
 (when (eq system-type 'windows-nt)
   (setq default-directory (concat (getenv "USERPROFILE") "\\")))

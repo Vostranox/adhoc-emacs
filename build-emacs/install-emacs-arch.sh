@@ -85,7 +85,7 @@ cd build
     --with-imagemagick \
     --with-tree-sitter
 
-make -j"$JOBS" bootstrap
+make -j"$JOBS" bootstrap || make bootstrap
 make install
 
 echo "[emacs-build] Installed to $PREFIX"
