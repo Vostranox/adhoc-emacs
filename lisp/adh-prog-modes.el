@@ -83,7 +83,7 @@
 
 ;; Drop each major mode's local keymap so the global AdHoc/meow bindings win
 ;; uniformly, instead of being shadowed by mode-specific keys.
-(dolist (hook '(prog-mode-hook nxml-mode-hook markdown-mode-hook))
+(dolist (hook '(prog-mode-hook nxml-mode-hook markdown-mode-hook markdown-ts-mode-hook))
   (add-hook hook (lambda () (use-local-map nil))))
 
 (provide 'adh-prog-modes)
