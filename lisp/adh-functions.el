@@ -111,6 +111,7 @@ Return non-nil on success, nil if non-graphical or the font is missing."
              (find-font (font-spec :family family)))
         (progn
           (set-face-attribute 'default nil :family family :height height)
+          (set-face-attribute 'fixed-pitch nil :family family :height height)
           t)
       nil)))
 
