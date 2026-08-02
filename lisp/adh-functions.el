@@ -340,11 +340,11 @@ erroring, so point lands inside the next list ahead."
                     (not (string-match-p "^[ *]" (car arg)))))))
 
 (defun adh-kill-other-buffers ()
-  "Kill all buffers except the current one, *scratch*, *Messages* and internal buffers."
+  "Kill all buffers except visible ones, *scratch*, *Messages* and internal buffers."
   (interactive)
-  (let ((keep (list (current-buffer)
-                    (get-buffer "*scratch*")
-                    (get-buffer "*Messages*")))
+  (let ((keep (append (mapcar #'window-buffer (window-list-1 nil nil t))
+                      (list (get-buffer "*scratch*")
+                            (get-buffer "*Messages*"))))
         (count 0))
     (dolist (buf (buffer-list))
       (unless (or (memq buf keep)
