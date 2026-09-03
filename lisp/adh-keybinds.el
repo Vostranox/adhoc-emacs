@@ -592,6 +592,8 @@ The remaining BODY is bindings as in `adh-keymap-set'."
 
 (with-eval-after-load 'diff-hl
   (adh-keymap-set diff-hl-mode-map
+    ("C-M-f" #'diff-hl-diff-goto-hunk)
+    ("C-M-o" #'diff-hl-show-hunk-ediff)
     ("C-M-a" #'diff-hl-next-hunk)
     ("C-M-e" #'diff-hl-previous-hunk)
     ("C-M-h" #'diff-hl-show-hunk)))
