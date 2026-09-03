@@ -103,6 +103,7 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
 
   (Buffer-menu-name-width 28)
   (Buffer-menu-mode-width 14)
+  (window-divider-default-right-width 1)
   :config
   (setq-default case-fold-search t
                 indent-tabs-mode nil
@@ -162,6 +163,7 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
   (global-hl-line-mode 1)
   (global-whitespace-mode 1)
   (minibuffer-depth-indicate-mode 1)
+  (window-divider-mode 1)
   (winner-mode 1)
   :hook
   (emacs-startup . (lambda () (tab-bar-rename-tab "dev") (message "[adh] Activated %d packages in %s" (length package-activated-list) (emacs-init-time))))

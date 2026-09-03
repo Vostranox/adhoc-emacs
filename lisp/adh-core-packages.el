@@ -32,16 +32,25 @@
   (adh--isearch-with-region nil))
 
 (defun adh-enable-vc ()
-  "Turn the built-in VC backends on."
+  "Turn the built-in VC backends and `global-diff-hl-mode' on."
   (interactive)
-  (setq adh--vc-enabled t)
-  (setq vc-handled-backends '(RCS CVS SVN SCCS SRC Bzr Git Hg)))
+  (setq vc-handled-backends '(RCS CVS SVN SCCS SRC Bzr Git Hg))
+  (dolist (buf (buffer-list))
+    (with-current-buffer buf
+      (when (and buffer-file-name
+                 (not (file-remote-p buffer-file-name)))
+        (ignore-errors (vc-refresh-state)))))
+  (when (require 'diff-hl nil t)
+    (global-diff-hl-mode 1))
+  (setq adh--vc-enabled t))
 
 (defun adh-disable-vc ()
-  "Disable all built-in VC backends."
+  "Disable all built-in VC backends and `global-diff-hl-mode'."
   (interactive)
   (setq adh--vc-enabled nil)
-  (setq vc-handled-backends nil))
+  (setq vc-handled-backends nil)
+  (when (bound-and-true-p global-diff-hl-mode)
+    (global-diff-hl-mode -1)))
 
 (defun adh-toggle-vc-mode ()
   "Toggle the built-in VC backends on or off."

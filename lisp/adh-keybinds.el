@@ -121,6 +121,7 @@ The remaining BODY is bindings as in `adh-keymap-set'."
   ("C-c C-t a" #'adh-toggle-eglot-global)
   ("C-c C-t e" #'adh-toggle-eglot-format-on-save)
   ("C-c C-t i" #'adh-subword-toggle)
+  ("C-c C-t v" #'adh-toggle-vc-mode)
   ("C-c C-t ." #'adh-toggle-ide-mode)
   ("C-c C-t /" #'adh-toggle-func-case-at-point))
 
@@ -588,6 +589,12 @@ The remaining BODY is bindings as in `adh-keymap-set'."
     (adh-keymap-set git-rebase-mode-map
       ("M-a" #'git-rebase-move-line-down)
       ("M-e" #'git-rebase-move-line-up))))
+
+(with-eval-after-load 'diff-hl
+  (adh-keymap-set diff-hl-mode-map
+    ("C-M-a" #'diff-hl-next-hunk)
+    ("C-M-e" #'diff-hl-previous-hunk)
+    ("C-M-h" #'diff-hl-show-hunk)))
 
 (with-eval-after-load 'ibuffer
   (adh-keymap-set ibuffer-mode-map

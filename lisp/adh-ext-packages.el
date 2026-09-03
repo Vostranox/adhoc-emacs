@@ -70,4 +70,15 @@
 (use-package sudo-edit
   :ensure t :defer t)
 
+(use-package diff-hl
+  :ensure t :defer t
+  :config
+  (define-advice diff-hl-show-hunk-inline-show (:filter-return (overlay) adh-window-local)
+    (when (overlayp overlay)
+      (overlay-put overlay 'window (selected-window)))
+    overlay)
+  (with-eval-after-load 'magit
+    (add-hook 'magit-pre-refresh-hook #'diff-hl-magit-pre-refresh)
+    (add-hook 'magit-post-refresh-hook #'diff-hl-magit-post-refresh)))
+
 (provide 'adh-ext-packages)
