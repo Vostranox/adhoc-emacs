@@ -170,8 +170,17 @@
   (call-interactively #'jump-to-register)
   (recenter))
 
+(defun adh-consult-flymake-show-buffer-diagnostics ()
+  "Quit `consult-flymake' and list the source buffer's Flymake diagnostics instead."
+  (interactive)
+  (let ((buf (window-buffer (minibuffer-selected-window))))
+    (run-at-time 0 nil (lambda () (with-current-buffer buf (flymake-show-buffer-diagnostics))))
+    (minibuffer-quit-recursive-edit)))
+
+(defvar-keymap adh-consult-flymake-map)
+
 (use-package consult
-  :ensure t
+  :ensure t :defer t
   :custom
   (consult-buffer-filter "\\*")
   (consult-narrow-key "C-,")
@@ -196,8 +205,7 @@
         register-preview-function #'consult-register-format)
   (advice-add #'register-preview :override #'consult-register-window)
 
-  :hook
-  (embark-collect-mode . consult-preview-at-point-mode))
+  (consult-customize consult-flymake :keymap adh-consult-flymake-map))
 
 (use-package embark
   :ensure t

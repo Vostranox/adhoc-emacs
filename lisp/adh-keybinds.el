@@ -116,7 +116,7 @@ The remaining BODY is bindings as in `adh-keymap-set'."
 ;; C-c C-t
 (adh-keymap-set global-map
   ("C-c C-t f" #'adh-toggle-eglot-flymake)
-  ("C-c C-t o" #'flymake-show-buffer-diagnostics)
+  ("C-c C-t o" #'consult-flymake)
   ("C-c C-t h" #'adh-toggle-cmp-auto)
   ("C-c C-t a" #'adh-toggle-eglot-global)
   ("C-c C-t e" #'adh-toggle-eglot-format-on-save)
@@ -166,6 +166,9 @@ The remaining BODY is bindings as in `adh-keymap-set'."
 (adh-keymap-set minibuffer-local-shell-command-map
   ("C-a" #'adh-minibuffer-next-history-or-clear)
   ("C-e" #'previous-history-element))
+
+(adh-defkeymap adh-consult-flymake-map
+  ("M-a" #'adh-consult-flymake-show-buffer-diagnostics))
 
 ;;; leader map
 

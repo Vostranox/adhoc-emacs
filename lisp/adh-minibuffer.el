@@ -13,7 +13,7 @@
   (vertico-buffer-display-action
    '(display-buffer-same-window (inhibit-same-window . nil) (body-function . (lambda (win) (delete-other-windows win)))))
   :config
-  (setq vertico-multiform-commands nil)
+  (setq vertico-multiform-commands '((consult-flymake)))
   :hook
   (rfn-eshadow-update-overlay . vertico-directory-tidy))
 
