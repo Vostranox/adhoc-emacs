@@ -179,6 +179,27 @@
 
 (defvar-keymap adh-consult-flymake-map)
 
+(defun adh--imenu-marker (pos)
+  (pcase pos
+    ((pred markerp) pos)
+    ((pred integerp) (copy-marker pos))
+    (`(,p . ,_) (adh--imenu-marker p))))
+
+(defun adh-embark-export-imenu (names)
+  "Export imenu candidates NAMES to an occur buffer linking to their definitions."
+  (let ((items (if (minibufferp)
+                   (with-minibuffer-selected-window (consult-imenu--items))
+                 (consult-imenu--items))))
+    (embark-consult-export-location-occur
+     (delq nil
+           (mapcar (lambda (name)
+                     (when-let* ((marker (adh--imenu-marker (cdr (assoc name items)))))
+                       (propertize name 'consult-location
+                                   (cons marker
+                                         (with-current-buffer (marker-buffer marker)
+                                           (line-number-at-pos marker t))))))
+                   names)))))
+
 (use-package consult
   :ensure t :defer t
   :custom
@@ -225,6 +246,8 @@
                                  (adh-to-side-window)))))))
 
 (use-package embark-consult
-  :ensure t :after (consult embark))
+  :ensure t :after (consult embark)
+  :config
+  (setf (alist-get 'imenu embark-exporters-alist) #'adh-embark-export-imenu))
 
 (provide 'adh-consult)
