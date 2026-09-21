@@ -72,6 +72,7 @@ else
 fi
 
 cd "$SRC_DIR"
+git clean -xdf -- src lib lib-src
 ./autogen.sh
 mkdir -p build
 cd build
