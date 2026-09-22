@@ -27,9 +27,7 @@
   :ensure t :defer t
   :custom
   (company-idle-delay 0.2)
-  (company-minimum-prefix-length 3)
-  :config
-  (adh--rename-mode 'company-mode " company"))
+  (company-minimum-prefix-length 3))
 
 (use-package company-posframe
   :ensure t :after company

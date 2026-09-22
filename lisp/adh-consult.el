@@ -203,11 +203,16 @@
 (use-package consult
   :ensure t :defer t
   :custom
-  (consult-buffer-filter "\\*")
+  (consult-buffer-filter '("\\` " "\\`\\*"))
   (consult-narrow-key "C-,")
   (consult-preview-key "C-SPC")
   (consult-line-start-from-top t)
   :config
+  (plist-put consult-source-buffer :items
+             (lambda () (consult--buffer-query
+                         :sort 'visibility
+                         :predicate #'adh--buffer-listable-p
+                         :as #'consult--buffer-pair)))
   (defconst adh--fd-executable-path (locate-user-emacs-file (concat "opt/fd/bin/fd" (when (eq system-type 'windows-nt) ".exe"))))
   (defconst adh--consult-fd-args  (concat adh--fd-executable-path " --sort-by-depth --full-path --hidden --no-ignore --color=never --exclude .git --path-separator=/"))
   (defvar adh--consult-ripgrep-args-base consult-ripgrep-args)

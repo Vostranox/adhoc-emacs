@@ -102,7 +102,6 @@
   (dired-kill-when-opening-new-dired-buffer t)
   (dired-listing-switches "-alh --group-directories-first --sort=version")
   :hook
-  ;; Name Dired buffers "*d: repo/relative-path*" and register the dir with zoxide.
   (dired-mode . (lambda ()
                   (let* ((git-root   (locate-dominating-file default-directory ".git"))
                          (repo-name  (and git-root
@@ -117,7 +116,7 @@
                                       ((not git-root) relative)
                                       ((member relative '("." "./")) repo-name)
                                       (t (format "%s/%s" repo-name relative))))
-                         (final-name (format "*d: %s" core-name)))
+                         (final-name (file-name-as-directory core-name)))
                     (unless (string= (buffer-name) final-name)
                       (rename-buffer final-name t)))
                   (when (fboundp 'zoxide-add)
@@ -175,11 +174,6 @@ candidates as files because `recentf-open' is in `marginalia-command-categories'
     (find-file (completing-read "Open: " (mapcar #'consult--fast-abbreviate-file-name recentf-list) nil t)))
   (recentf-mode 1))
 
-(use-package eldoc
-  :ensure nil :defer t
-  :config
-  (adh--rename-mode 'eldoc-mode " eldoc"))
-
 (use-package vc
   :ensure nil
   :init
@@ -208,15 +202,5 @@ candidates as files because `recentf-open' is in `marginalia-command-categories'
   (ediff-keymap-setup . (lambda ()
                           (keymap-set ediff-mode-map "," #'ediff-next-difference)
                           (keymap-set ediff-mode-map "." #'ediff-previous-difference))))
-
-(use-package simple
-  :ensure nil
-  :config
-  (adh--rename-mode 'visual-line-mode " wrap"))
-
-(use-package completion-preview
-  :ensure nil
-  :config
-  (adh--rename-mode 'completion-preview-mode " cp"))
 
 (provide 'adh-core-packages)

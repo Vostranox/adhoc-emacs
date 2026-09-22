@@ -153,7 +153,7 @@ Dispatches to whatever RET would visit for the section at point
   (magit-commit-show-diff nil)
   (magit-bury-buffer-function #'magit-restore-window-configuration)
   (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1)
-  (magit-diff-refine-hunk t)
+  (magit-diff-refine-hunk nil)
   (magit-log-margin '(t "%Y-%m-%d %H:%M" magit-log-margin-width t 18))
   (magit-section-initial-visibility-alist
    '((staged . hide) (unstaged . hide) (untracked . hide) (stashes . hide) (unpushed . hide) (unpulled . hide)))
@@ -164,6 +164,11 @@ Dispatches to whatever RET would visit for the section at point
   :hook
   (magit-mode . (lambda () (let ((bn (buffer-name)))
                              (when (string-match "^magit\\(.*\\): \\(.*\\)" bn)
-                               (rename-buffer (format "*m%s: %s" (match-string 1 bn) (match-string 2 bn)) t))))))
+                               (let ((kind (string-remove-prefix "-" (match-string 1 bn)))
+                                     (what (match-string 2 bn)))
+                                 (rename-buffer (if (string-empty-p kind)
+                                                    what
+                                                  (format "%s: %s" kind what))
+                                                t)))))))
 
 (provide 'adh-magit)

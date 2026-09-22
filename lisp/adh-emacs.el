@@ -71,6 +71,7 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
   (kill-do-not-save-duplicates t)
   (save-interprogram-paste-before-kill t)
 
+  (whitespace-global-modes '(not magit-mode dired-mode wdired-mode diff-mode))
   (whitespace-line-column 10000)
   (whitespace-style
    '(face tabs spaces trailing lines-tail space-before-tab indentation
@@ -173,6 +174,7 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
   (after-init . (lambda () (advice-add #'forward-word :around (lambda (orig &rest args) (let ((forward-word-function nil)) (apply orig args))))))
   (find-file-not-found-functions . adh--create-parent-dir-on-the-fly)
   (text-mode . visual-line-mode)
+  (diff-mode . (lambda () (setq-local show-trailing-whitespace t)))
   (before-save . delete-trailing-whitespace))
 
 (provide 'adh-emacs)

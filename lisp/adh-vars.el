@@ -57,4 +57,9 @@ Used by `adh--get-project-dir'; add entries with `adh-add-root-marker'."
   :group 'adhoc
   :type '(repeat symbol))
 
+(defcustom adh-hidden-buffer-modes '(magit-mode dired-mode)
+  "Parent modes whose buffers stay out of buffer switching."
+  :group 'adhoc
+  :type '(repeat symbol))
+
 (provide 'adh-vars)

@@ -97,8 +97,6 @@
   :init
   (setq eglot-stay-out-of '(flymake eldoc yas))
   :config
-  (defconst adh--eglot-mode-line-name " lsp")
-  (add-to-list 'minor-mode-alist '(adh--eglot-global-enabled adh--eglot-mode-line-name))
   (add-to-list 'eglot-ignored-server-capabilities :inlayHintProvider)
   (add-to-list 'eglot-ignored-server-capabilities :semanticTokensProvider)
   (add-to-list 'eglot-ignored-server-capabilities :documentOnTypeFormattingProvider)
@@ -112,8 +110,6 @@
      flymake-mode-line-warning-counter
      flymake-mode-line-note-counter ")"))
   (flymake-mode-line-format
-   '(" " flymake-mode-line-exception flymake-mode-line-counters))
-  :config
-  (adh--rename-mode 'flymake-mode ""))
+   '(" " flymake-mode-line-exception flymake-mode-line-counters)))
 
 (provide 'adh-eglot)

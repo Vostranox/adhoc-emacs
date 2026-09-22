@@ -331,13 +331,23 @@ erroring, so point lands inside the next list ahead."
           (t (switch-to-buffer
               (completing-read prompt names nil t nil nil (car names)))))))
 
+(defun adh--buffer-listable-p (buf)
+  "Return non-nil when BUF should appear in buffer switching."
+  (and (buffer-live-p buf)
+       (not (string-match-p "\\`[ *]" (buffer-name buf)))
+       (not (apply #'provided-mode-derived-p
+                   (buffer-local-value 'major-mode buf)
+                   adh-hidden-buffer-modes))))
+
 (defun adh-switch-to-buffer ()
-  "Switch to a buffer, hiding hidden and special (* or space) buffers."
+  "Switch to a buffer, hiding internal ones and `adh-hidden-buffer-modes'."
   (interactive)
   (switch-to-buffer
    (read-buffer "Buffer: " nil t
-                #'(lambda (arg)
-                    (not (string-match-p "^[ *]" (car arg)))))))
+                #'(lambda (arg) (adh--buffer-listable-p (cdr arg))))))
+
+(setq switch-to-prev-buffer-skip
+      (lambda (_window buf _bury-or-kill) (not (adh--buffer-listable-p buf))))
 
 (defun adh-kill-other-buffers ()
   "Kill all buffers except visible ones, *scratch*, *Messages* and internal buffers."
@@ -506,7 +516,7 @@ A numeric suffix is added as needed to avoid overwriting."
           `(:group-function
             ,(lambda (cand transform)
                (if transform cand
-                 (if-let (path (locate-file cand exec-path '() 'file-executable-p))
+                 (if-let* ((path (locate-file cand exec-path '() 'file-executable-p)))
                      (file-name-directory path) "non-executable")))))
          (exe (completing-read "Exe: " (apply-partially #'locate-file-completion-table exec-path '()) nil t)))
     (dired-jump nil (locate-file exe exec-path '()))))
