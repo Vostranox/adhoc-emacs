@@ -15,13 +15,25 @@
                (company-manual-begin))
     (completion-at-point)))
 
+(defun adh--cmp-auto-p ()
+  "Return non-nil when automatic popup completion is on for the active backend."
+  (cond ((eq adh-completion-backend 'company)
+         (bound-and-true-p global-company-mode))
+        ((eq adh-completion-backend 'corfu)
+         (bound-and-true-p global-corfu-mode))))
+
+(defun adh--set-cmp-auto (on)
+  "Turn automatic popup completion for the active backend ON or off."
+  (let ((arg (if on 1 -1)))
+    (cond ((eq adh-completion-backend 'company)
+           (global-company-mode arg))
+          ((eq adh-completion-backend 'corfu)
+           (global-corfu-mode arg)))))
+
 (defun adh-toggle-cmp-auto ()
   "Toggle automatic popup completion for the active backend."
   (interactive)
-  (cond ((eq adh-completion-backend 'company)
-         (global-company-mode 'toggle))
-        ((eq adh-completion-backend 'corfu)
-         (global-corfu-mode 'toggle))))
+  (adh--set-cmp-auto (not (adh--cmp-auto-p))))
 
 (use-package company
   :ensure t :defer t

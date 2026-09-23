@@ -13,7 +13,7 @@
 
 (defun adh--eglot-format-safe ()
   "Format the buffer via the LSP server, but only if one is managing it."
-  (when (eglot-managed-p)
+  (when (and (fboundp 'eglot-managed-p) (eglot-managed-p))
     (eglot-format-buffer)))
 
 (defun adh--eglot-global-disable ()
@@ -44,9 +44,34 @@
 (defun adh--eglot-disable-flymake ()
   "Keep eglot out of flymake and reconnect the current server to drop diagnostics."
   (add-to-list 'eglot-stay-out-of 'flymake)
-  (when (bound-and-true-p flymake-mode)
+  (when (and (eglot-current-server) (bound-and-true-p flymake-mode))
     (call-interactively #'eglot-reconnect)
     (flymake-mode 0)))
+
+(defun adh--eglot-flymake-p ()
+  "Return non-nil when eglot feeds diagnostics to flymake."
+  (not (memq 'flymake eglot-stay-out-of)))
+
+(defun adh--eglot-format-on-save-p ()
+  "Return non-nil when buffers are formatted via LSP on save."
+  (and (memq #'adh--eglot-format-safe (default-value 'before-save-hook)) t))
+
+(defun adh--eglot-set-flymake (on)
+  "Make eglot feed diagnostics to flymake when ON, or keep it out of flymake."
+  (cond ((and on (not (adh--eglot-flymake-p))) (adh--eglot-enable-flymake))
+        ((and (not on) (adh--eglot-flymake-p)) (adh--eglot-disable-flymake))))
+
+(defun adh--eglot-set-format-on-save (on)
+  "Format buffers via LSP on save when ON, otherwise stop."
+  (if on
+      (add-hook 'before-save-hook #'adh--eglot-format-safe)
+    (remove-hook 'before-save-hook #'adh--eglot-format-safe)))
+
+(defun adh--eglot-set-global (on)
+  "Auto-start eglot in supported buffers when ON, otherwise shut every server down."
+  (require 'eglot)
+  (cond ((and on (not adh--eglot-global-enabled)) (adh--eglot-global-enable))
+        ((and (not on) adh--eglot-global-enabled) (adh--eglot-global-disable))))
 
 (defun adh-set-eglot-stay-out-of (features)
   "Set `eglot-stay-out-of' to FEATURES and reconnect any running server."
@@ -69,28 +94,20 @@
 (defun adh-toggle-eglot-global ()
   "Toggle auto-starting eglot in all supported buffers."
   (interactive)
-  (require 'eglot)
-  (if adh--eglot-global-enabled
-      (adh--eglot-global-disable)
-    (adh--eglot-global-enable)))
+  (adh--eglot-set-global (not adh--eglot-global-enabled)))
 
 (defun adh-toggle-eglot-format-on-save ()
   "Toggle LSP formatting of the buffer on every save."
   (interactive)
-  (if (member #'adh--eglot-format-safe (default-value 'before-save-hook))
-      (progn
-        (remove-hook 'before-save-hook #'adh--eglot-format-safe)
-        (message "[adh] format on save disabled"))
-    (progn
-      (add-hook 'before-save-hook #'adh--eglot-format-safe)
-      (message "[adh] format on save enabled"))))
+  (let ((on (not (adh--eglot-format-on-save-p))))
+    (adh--eglot-set-format-on-save on)
+    (message "[adh] format on save %s" (if on "enabled" "disabled"))))
 
 (defun adh-toggle-eglot-flymake ()
   "Toggle whether eglot feeds diagnostics to flymake."
   (interactive)
-  (if (memq #'flymake eglot-stay-out-of)
-      (adh--eglot-enable-flymake)
-    (adh--eglot-disable-flymake)))
+  (require 'eglot)
+  (adh--eglot-set-flymake (not (adh--eglot-flymake-p))))
 
 (use-package eglot
   :ensure nil :defer 10

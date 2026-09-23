@@ -63,6 +63,6 @@ if [[ ! -d "$EMACS_DIR/elpa" ]]; then
 else
     emacs --batch --eval "(progn
         (require 'package)
-        (package-refresh-contents)
-        (package-upgrade-all t))"
+        (add-to-list 'package-archives '(\"melpa\" . \"https://melpa.org/packages/\") t)
+        (package-upgrade-all))"
 fi

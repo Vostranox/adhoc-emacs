@@ -1,5 +1,8 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(defvar consult-fd-args)
+(defvar consult-preview-key)
+
 (with-eval-after-load 'consult-register
   (cl-defmethod consult-register--describe ((val marker))
     "Describe marker register VAL as aligned \"buffer:line │ content\"."

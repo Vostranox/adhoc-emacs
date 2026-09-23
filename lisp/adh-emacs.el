@@ -45,6 +45,7 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
 
   (compile-command "")
   (compilation-scroll-output t)
+  (compilation-environment '("NO_COLOR=1"))
 
   (completion-ignored-extensions (delete ".git/" completion-ignored-extensions))
 
@@ -168,10 +169,9 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
   (winner-mode 1)
   :hook
   (emacs-startup . (lambda () (tab-bar-rename-tab "dev") (message "[adh] Activated %d packages in %s" (length package-activated-list) (emacs-init-time))))
-  ;; Always use the default sexp/word motion, ignoring any mode-installed
-  ;; `forward-sexp-function'/`forward-word-function' (e.g. tree-sitter's).
+  ;; Always use the default sexp motion, ignoring any mode-installed
+  ;; `forward-sexp-function' (e.g. tree-sitter's).
   (after-init . (lambda () (advice-add #'forward-sexp :around (lambda (orig &rest args) (let ((forward-sexp-function nil)) (apply orig args))))))
-  (after-init . (lambda () (advice-add #'forward-word :around (lambda (orig &rest args) (let ((forward-word-function nil)) (apply orig args))))))
   (find-file-not-found-functions . adh--create-parent-dir-on-the-fly)
   (text-mode . visual-line-mode)
   (diff-mode . (lambda () (setq-local show-trailing-whitespace t)))

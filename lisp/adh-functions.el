@@ -1,5 +1,7 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(defvar ls-lisp-use-insert-directory-program)
+
 (defvar adh--font-hook nil
   "Frame hook installed by `adh-set-font' to apply the font to new frames.")
 (defconst adh--tmux-command (if (eq system-type 'windows-nt) "wsl tmux" "tmux")
@@ -665,12 +667,32 @@ Turns `subword-mode' (so word commands stop at camelCase boundaries) and
   (glasses-mode 'toggle)
   (subword-mode 'toggle))
 
+(defun adh--ide-mode-p ()
+  "Return non-nil when every part of the IDE stack is on."
+  (and (adh--cmp-auto-p)
+       (adh--eglot-flymake-p)
+       (adh--eglot-format-on-save-p)
+       adh--eglot-global-enabled))
+
+(defun adh-set-ide-mode (on)
+  "Turn the IDE stack (completion, eglot, flymake and format-on-save) ON or off."
+  (require 'eglot)
+  (if on
+      (progn
+        (adh--set-cmp-auto t)
+        (adh--eglot-set-flymake t)
+        (adh--eglot-set-format-on-save t)
+        (adh--eglot-set-global t))
+    (adh--eglot-set-global nil)
+    (adh--eglot-set-flymake nil)
+    (adh--eglot-set-format-on-save nil)
+    (adh--set-cmp-auto nil)))
+
 (defun adh-toggle-ide-mode ()
-  "Toggle the IDE stack: completion, eglot, flymake and format-on-save."
+  "Turn the whole IDE stack on, or off when all of it is already on."
   (interactive)
-  (adh-toggle-cmp-auto)
-  (adh-toggle-eglot-flymake)
-  (adh-toggle-eglot-format-on-save)
-  (adh-toggle-eglot-global))
+  (let ((on (not (adh--ide-mode-p))))
+    (adh-set-ide-mode on)
+    (message "[adh] IDE mode %s" (if on "on" "off"))))
 
 (provide 'adh-functions)

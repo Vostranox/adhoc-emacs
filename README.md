@@ -25,7 +25,7 @@ This setup defaults to a custom modal layout. To write your own keybindings from
 
 The install script will:
 - Clone the [gruber-material-dark](https://github.com/Vostranox/gruber-material-dark) theme
-- Build and install a custom [fd](https://github.com/Vostranox/fd/tree/feature/simple_sort_by_depth) binary under `~/.emacs.d/opt/fd`
+- Build and install a custom [fd](https://github.com/Vostranox/fd/tree/simple_sort_by_depth) binary under `~/.emacs.d/opt/fd`
 - Load the `init.el` file and install Tree-sitter grammars
 
 ```bash

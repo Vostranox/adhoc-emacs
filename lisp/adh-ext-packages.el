@@ -78,7 +78,6 @@
       (overlay-put overlay 'window (selected-window)))
     overlay)
   (with-eval-after-load 'magit
-    (add-hook 'magit-pre-refresh-hook #'diff-hl-magit-pre-refresh)
     (add-hook 'magit-post-refresh-hook #'diff-hl-magit-post-refresh)))
 
 (provide 'adh-ext-packages)

@@ -7,6 +7,8 @@
   :config
   (dolist (lang adh-treesit-excluded-langs)
     (setq treesit-auto-langs (remove lang treesit-auto-langs)))
+  (add-to-list 'treesit-language-source-alist
+               '(zig "https://github.com/tree-sitter-grammars/tree-sitter-zig"))
   (global-treesit-auto-mode 1))
 
 (use-package c-ts-mode
@@ -26,7 +28,7 @@
          rust-ts-mode--font-lock-settings)))
 
 (use-package zig-ts-mode
-  :ensure nil :defer t
+  :ensure t :defer t
   :config
   ;; Same as rust-ts-mode: don't paint tree-sitter ERROR nodes red.
   (setq zig-ts--font-lock-settings

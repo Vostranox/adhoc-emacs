@@ -7,10 +7,10 @@
   (setq server-name "main-server")
   (setq server-auth-dir (expand-file-name "server/" user-emacs-directory)))
 
-(unless (daemonp)
-  (when (server-running-p)
-    (server-force-delete))
-  (server-start)
-  (message "[adh] Emacs server started."))
+(unless (or (daemonp) noninteractive)
+  (if (eq (server-running-p) t)
+      (message "[adh] Another Emacs is running the server; not starting one.")
+    (server-start)
+    (message "[adh] Emacs server started.")))
 
 (provide 'adh-server)

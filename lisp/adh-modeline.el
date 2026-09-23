@@ -1,16 +1,16 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-(defvar adh--ml-bg       "#181818" "Frame background; the mode line dissolves into it.")
-(defvar adh--ml-isle     "#1f1f1f" "Island background.")
-(defvar adh--ml-pill     "#282828" "Sub-island and pill background.")
-(defvar adh--ml-fg       "#c8c8d5" "Primary text.")
-(defvar adh--ml-muted    "#6b7570" "Secondary text.")
-(defvar adh--ml-accent   "#96a6c8" "Identity: the file name and its project.")
-(defvar adh--ml-faint    "#3e3b3c" "Dividers; quieter than what they divide.")
-(defvar adh--ml-bg3      "#484848" "Palette bg3; only a mixing ingredient.")
-(defvar adh--ml-inactive "#484848" "Present but not in force; the unmanaged LSP state.")
-(defvar adh--ml-warn     "#f0ca54" "Needs care: unsaved changes, a root session.")
-(defvar adh--ml-strong   "#333132" "Background of the box that marks a choice, a step above a grouping box.")
+(defvar adh--ml-bg       "#181818")
+(defvar adh--ml-isle     "#1f1f1f")
+(defvar adh--ml-pill     "#282828")
+(defvar adh--ml-fg       "#c8c8d5")
+(defvar adh--ml-muted    "#6b7570")
+(defvar adh--ml-accent   "#96a6c8")
+(defvar adh--ml-faint    "#3e3b3c")
+(defvar adh--ml-bg3      "#484848")
+(defvar adh--ml-inactive "#484848")
+(defvar adh--ml-warn     "#f0ca54")
+(defvar adh--ml-strong   "#333132")
 
 (defconst adh--ml-palette-map
   '((adh--ml-bg       . gruber-material-dark-bg0)
@@ -366,6 +366,13 @@
   (add-hook 'eglot-server-initialized-hook #'adh--ml-bump-lsp-epoch)
   (add-hook 'eglot-managed-mode-hook #'adh--ml-bump-lsp-epoch))
 
+(defun adh--ml-lsp-toggled (&rest _)
+  "Redraw every mode line's LSP state after global eglot is switched."
+  (adh--ml-bump-lsp-epoch)
+  (force-mode-line-update t))
+
+(add-variable-watcher 'adh--eglot-global-enabled #'adh--ml-lsp-toggled)
+
 (defvar-local adh--ml-lsp-cache nil
   "Cons of (EPOCH . STATE) for this buffer.")
 
@@ -387,13 +394,15 @@
          found)))
 
 (defun adh--ml-lsp-state ()
-  "Return `managed', `project', or nil."
+  "Return `managed', `unmanaged', or nil."
   (unless (and adh--ml-lsp-cache (eq (car adh--ml-lsp-cache) adh--ml-lsp-epoch))
     (setq adh--ml-lsp-cache
           (cons adh--ml-lsp-epoch
                 (cond
                  ((and (fboundp 'eglot-managed-p) (eglot-managed-p)) 'managed)
-                 ((adh--ml-lsp-server-covers-p) 'project)))))
+                 ((or (bound-and-true-p adh--eglot-global-enabled)
+                      (adh--ml-lsp-server-covers-p))
+                  'unmanaged)))))
   (cdr adh--ml-lsp-cache))
 
 (defun adh--ml-lsp-button (text color)
@@ -424,7 +433,7 @@
                              (string-trim (mapconcat #'identity extra " ")))))
                    (unless (string-empty-p txt)
                      (concat " " (adh--ml-force txt adh--ml-fg))))))))
-    ('project (adh--ml-lsp-button "lsp" adh--ml-inactive))))
+    ('unmanaged (adh--ml-lsp-button "lsp" adh--ml-inactive))))
 
 (defconst adh--ml-minors-excluded
   '(flymake-mode eglot--managed-mode
