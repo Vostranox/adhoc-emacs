@@ -36,8 +36,8 @@ Set to nil if you want to define your own layout from scratch."
   :group 'adhoc
   :type 'string)
 
-(defcustom adh-mono-spaced-font-size 80
-  "Default font height in 1/10 pt (80 = 8pt) for the `default' face."
+(defcustom adh-mono-spaced-font-size 105
+  "Default font face."
   :group 'adhoc
   :type 'integer)
 
