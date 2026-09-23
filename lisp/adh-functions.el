@@ -297,12 +297,14 @@ erroring, so point lands inside the next list ahead."
   "Set the height of popup window WIN.
 Popups whose text is complete, like help or exports, fit their text,
 up to `adh-list-max-height' lines.  Compile, grep and shell buffers
-get that full height at once, since their output arrives later."
+get that full height at once, or as much as the frame allows, since
+their output arrives later."
   (let* ((buf (window-buffer win))
          (max adh-list-max-height)
+         (room (+ (window-total-height win) (window-max-delta win)))
          (growing (or (get-buffer-process buf)
                       (local-variable-p 'compilation-directory buf))))
-    (fit-window-to-buffer win max (and growing max))))
+    (fit-window-to-buffer win max (and growing (min max room)))))
 
 (defun adh--popper-display (buffer &optional alist)
   "Show popup BUFFER where it is visible, else at the bottom, and select it."

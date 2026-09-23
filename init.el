@@ -1,7 +1,7 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-(when (version< emacs-version "30")
-  (error "[adh][error] The configuration assumes Emacs 30 or newer (found %s)." emacs-version))
+(when (version< emacs-version "31")
+  (error "[adh][error] The configuration assumes Emacs 31 or newer (found %s)." emacs-version))
 
 (defvar adh--init-errors-p nil
   "Non-nil if any adhoc loading errors occurred during initialization.")

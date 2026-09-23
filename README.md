@@ -5,7 +5,7 @@ Tested and used on GNU/Linux, macOS, and Windows.
 
 ## Prerequisites
 
-- **Requires**: Emacs (30+), Git, and Cargo.
+- **Requires**: Emacs (31+), Git, and Cargo.
 - **Dependencies**: Ripgrep, Zoxide
 
 ## Configuration
