@@ -74,15 +74,14 @@
             (setq deactivate-mark nil))
         (goto-char (+ new-start point-offset))))))
 
-(defun adh--sidewin-target-p (buf _action)
-  "Return non-nil if BUF is an output buffer that belongs in a side window."
+(defun adh--popup-buffer-p (buf)
+  "Return non-nil if BUF matches an entry of `adh-popup-buffers'."
   (with-current-buffer buf
-    (and (derived-mode-p
-          'special-mode
-          'comint-mode
-          'compilation-mode
-          'messages-buffer-mode)
-         (not (derived-mode-p 'magit-mode)))))
+    (seq-some (lambda (entry)
+                (if (stringp entry)
+                    (string-match-p entry (buffer-name))
+                  (derived-mode-p entry)))
+              adh-popup-buffers)))
 
 (defun adh--snake-to-pascal (str)
   "Convert snake_case STR to PascalCase."
@@ -294,36 +293,51 @@ erroring, so point lands inside the next list ahead."
   (interactive)
   (split-window (frame-root-window) nil 'right))
 
-(defun adh-select-side-window ()
-  "Select the first side window, if any."
-  (interactive)
-  (when-let* ((win (window-with-parameter 'window-side)))
-    (select-window win)))
+(defun adh--popper-display (buffer &optional alist)
+  "Show popup BUFFER where it is visible, else at the bottom, and select it."
+  (select-window
+   (or (display-buffer-reuse-window buffer alist)
+       (popper-display-popup-at-bottom
+        buffer (append alist '((window-parameters . ((no-other-window . t)))))))))
 
-(defun adh-to-side-window ()
-  "Move the current buffer into a bottom side window."
+(defun adh-select-popup ()
+  "Select the open popup, or reopen the last one."
   (interactive)
-  (unless (window-parameter nil 'window-side)
-    (let ((buf (current-buffer)))
-      (delete-window)
-      (display-buffer-in-side-window
-       buf
-       '((side . bottom)
-         (window-height . 30)
-         (window-parameters . ((no-other-window . t)))
-         (body-function . select-window)))))
-  (shrink-window-if-larger-than-buffer))
+  (if-let* ((win (caar popper-open-popup-alist)))
+      (select-window win)
+    (popper-toggle)))
+
+(defun adh-popup-toggle-type ()
+  "Turn the popup into a normal window, or the current buffer into a popup.
+The normal window opens at the bottom with the popup's height."
+  (interactive)
+  (let ((display-buffer-overriding-action
+         (if (memq popper-popup-status '(popup user-popup))
+             `(display-buffer-at-bottom (window-height . ,(window-total-height)))
+           display-buffer-overriding-action)))
+    (popper-toggle-type)))
+
+(defun adh--main-window ()
+  "Return the most recently used window that is not a side window."
+  (car (sort (seq-remove (lambda (w) (window-parameter w 'window-side))
+                         (window-list nil 'nomini))
+             (lambda (a b) (> (window-use-time a) (window-use-time b))))))
 
 (defun adh-delete-other-windows ()
-  "Delete all other windows, restoring the current buffer if it was a side window."
+  "Delete other windows, leaving side panels such as treemacs in place.
+From the bottom window its buffer fills the frame but stays a popup, so
+it goes back to the bottom the next time it is shown.  From a side panel
+the most recently used window is kept."
   (interactive)
-  (let ((buf (current-buffer)))
-    (if (window-parameter nil 'window-side)
-        (progn
-          (window-toggle-side-windows)
-          (delete-other-windows-internal)
-          (switch-to-buffer buf))
-      (delete-other-windows-internal))))
+  (let ((win (selected-window)))
+    (if (not (window-parameter win 'window-side))
+        (delete-other-windows win)
+      (let ((main (adh--main-window)))
+        (unless (window-parameter win 'no-delete-other-windows)
+          (set-window-dedicated-p main nil)
+          (set-window-buffer main (window-buffer win)))
+        (delete-other-windows main)
+        (select-window (if (window-live-p win) win main))))))
 
 (defun adh-switch-buffer-of-mode (mode prompt)
   "Switch to a buffer whose major mode derives from MODE."

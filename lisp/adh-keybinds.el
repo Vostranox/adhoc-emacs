@@ -54,7 +54,7 @@ The remaining BODY is bindings as in `adh-keymap-set'."
 (adh-keymap-set global-map
   ("C-l" #'recenter-top-bottom)
   ("C-d" #'other-window)
-  ("C-b" #'adh-select-side-window)
+  ("C-b" #'adh-select-popup)
   ("C-n" #'consult-isearch-history)
   ("C-r" #'adh-isearch-backward-with-region)
   ("C-t" #'adh-keyboard-quit-dwim)
@@ -261,8 +261,10 @@ The remaining BODY is bindings as in `adh-keymap-set'."
   ("s" #'split-window-horizontally)
   ("S" #'adh-split-right-root)
   ("w" #'window-swap-states)
-  ("m" #'window-toggle-side-windows)
-  ("x" #'adh-to-side-window))
+  ("m" #'popper-toggle)
+  ("a" #'popper-cycle)
+  ("e" #'popper-cycle-backwards)
+  ("x" #'adh-popup-toggle-type))
 
 (adh-defkeymap adh-buffer-keymap
   :map adh-leader-map

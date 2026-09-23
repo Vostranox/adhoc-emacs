@@ -136,12 +136,11 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
   (adh-add-to-path "~/bin")
 
   (setq display-buffer-alist
-        `((adh--sidewin-target-p
+        '(("\\*Completions\\*"
            (display-buffer-reuse-window display-buffer-in-side-window)
            (side . bottom)
            (window-height . 30)
-           (window-parameters . ((no-other-window . t)))
-           (body-function . select-window))))
+           (window-parameters . ((no-other-window . t))))))
 
   (setq-default truncate-lines nil)
 

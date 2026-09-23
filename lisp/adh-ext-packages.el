@@ -80,4 +80,15 @@
   (with-eval-after-load 'magit
     (add-hook 'magit-post-refresh-hook #'diff-hl-magit-post-refresh)))
 
+(use-package popper
+  :ensure t :demand t
+  :custom
+  (popper-reference-buffers '(adh--popup-buffer-p))
+  (popper-display-function #'adh--popper-display)
+  (popper-window-height 30)
+  (popper-mode-line "")
+  :config
+  (put 'popper-popup-status 'permanent-local t)
+  (popper-mode 1))
+
 (provide 'adh-ext-packages)

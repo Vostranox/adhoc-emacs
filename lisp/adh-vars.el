@@ -62,4 +62,17 @@ Used by `adh--get-project-dir'; add entries with `adh-add-root-marker'."
   :group 'adhoc
   :type '(repeat symbol))
 
+(defcustom adh-popup-buffers
+  '("\\*Warnings\\*" "\\*Async Shell Command\\*" "Output\\*$"
+    "\\*Embark Export" "^\\*e: " "\\*eldoc"
+    help-mode apropos-mode messages-buffer-mode backtrace-mode
+    compilation-mode comint-mode occur-mode xref--xref-buffer-mode
+    flymake-diagnostics-buffer-mode flymake-project-diagnostics-mode
+    embark-collect-mode)
+  "Buffers that open in the bottom popup window.
+Each entry is a buffer name regexp or a major mode; a mode also
+matches the modes derived from it."
+  :group 'adhoc
+  :type '(repeat (choice regexp symbol)))
+
 (provide 'adh-vars)
