@@ -6,7 +6,7 @@
   (vertico-mode 1)
   (vertico-multiform-mode 1)
   :custom
-  (vertico-count 25)
+  (vertico-count adh-list-max-height)
   (vertico-resize 'grow-only)
   (vertico-flat-max-lines 3)
   (vertico-multiform-categories '((t flat)))

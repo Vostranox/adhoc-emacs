@@ -17,6 +17,7 @@
 (setq adh-treesit-excluded-langs '(cmake))
 
 (add-to-list 'adh-popup-buffers "\\*Man ")
+(setq adh-list-max-height 15)
 
 (when (eq system-type 'windows-nt)
   (setq default-directory (concat (getenv "USERPROFILE") "\\")))

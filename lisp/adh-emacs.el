@@ -80,7 +80,7 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
 
   (completion-show-help nil)
   (completions-header-format "")
-  (completions-max-height 30)
+  (completions-max-height adh-list-max-height)
   (completions-format 'one-column)
   (completions-detailed t)
   (completion-eager-display nil)
@@ -179,6 +179,7 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
   (text-mode . visual-line-mode)
   (diff-mode . (lambda () (setq-local show-trailing-whitespace t)))
   (completion-list-mode . (lambda () (display-line-numbers-mode -1)))
+  (compilation-mode . (lambda () (setq-local scroll-conservatively 101)))
   (completion-setup . adh--completions-preselect-first)
   (before-save . delete-trailing-whitespace))
 

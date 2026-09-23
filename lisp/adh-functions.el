@@ -293,12 +293,25 @@ erroring, so point lands inside the next list ahead."
   (interactive)
   (split-window (frame-root-window) nil 'right))
 
+(defun adh--popper-window-height (win)
+  "Set the height of popup window WIN.
+Popups whose text is complete, like help or exports, fit their text,
+up to `adh-list-max-height' lines.  Compile, grep and shell buffers
+get that full height at once, since their output arrives later."
+  (let* ((buf (window-buffer win))
+         (max adh-list-max-height)
+         (growing (or (get-buffer-process buf)
+                      (local-variable-p 'compilation-directory buf))))
+    (fit-window-to-buffer win max (and growing max))))
+
 (defun adh--popper-display (buffer &optional alist)
   "Show popup BUFFER where it is visible, else at the bottom, and select it."
-  (select-window
-   (or (display-buffer-reuse-window buffer alist)
-       (popper-display-popup-at-bottom
-        buffer (append alist '((window-parameters . ((no-other-window . t)))))))))
+  (let ((win (or (display-buffer-reuse-window buffer alist)
+                 (popper-display-popup-at-bottom
+                  buffer (append alist '((window-parameters . ((no-other-window . t)))))))))
+    (when (window-parameter win 'window-side)
+      (adh--popper-window-height win))
+    (select-window win)))
 
 (defun adh-select-popup ()
   "Select the open popup, or reopen the last one."
@@ -487,6 +500,12 @@ A numeric suffix is added as needed to avoid overwriting."
   "Set frame OPACITY (0-100) for the current and future frames."
   (setq adh-frame-opacity opacity)
   (adh--apply-frame-parameter 'alpha adh-frame-opacity))
+
+(defun adh-set-list-max-height (lines)
+  "Show at most LINES lines in vertico, the *Completions* list and popups."
+  (setq adh-list-max-height lines
+        vertico-count lines
+        completions-max-height lines))
 
 (defun adh-set-font (family height)
   "Set the default font to FAMILY at HEIGHT, including for future frames."

@@ -85,7 +85,7 @@
   :custom
   (popper-reference-buffers '(adh--popup-buffer-p))
   (popper-display-function #'adh--popper-display)
-  (popper-window-height 30)
+  (popper-window-height #'adh--popper-window-height)
   (popper-mode-line "")
   :config
   (put 'popper-popup-status 'permanent-local t)

@@ -9,6 +9,7 @@
 
 (adh-set-frame-opacity 100)
 (adh-set-window-decoration t)
+(adh-set-list-max-height 20)
 
 (adh-set-font adh-mono-spaced-font 110)
 

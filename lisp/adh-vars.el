@@ -75,4 +75,10 @@ matches the modes derived from it."
   :group 'adhoc
   :type '(repeat (choice regexp symbol)))
 
+(defcustom adh-list-max-height 25
+  "Maximum number of lines shown by vertico, the *Completions* list and popups.
+Popups shrink to fit their buffer, except compile, grep and shell output."
+  :group 'adhoc
+  :type 'integer)
+
 (provide 'adh-vars)
