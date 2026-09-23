@@ -47,6 +47,7 @@
   :ensure t
   :custom
   (completion-preview-sort-function #'prescient-completion-sort)
+  (completions-sort #'prescient-completion-sort)
   :config
   ;; Same tofu problem as above, but for prescient's own regexps: let any "$"
   ;; anchor sit before consult's invisible suffix char instead of the true end.

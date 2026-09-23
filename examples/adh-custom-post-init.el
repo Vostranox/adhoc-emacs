@@ -5,7 +5,7 @@
 (setq adh-tmux-cd-session "session:window.pane")
 
 (adh-set-eglot-stay-out-of '(eldoc flymake yas))
-(adh-set-completion-backend 'company)
+(adh-set-completion-ui 'company)
 
 (adh-set-frame-opacity 100)
 (adh-set-window-decoration t)

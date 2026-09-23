@@ -79,8 +79,12 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
           newline empty space-after-tab space-mark tab-mark))
 
   (completion-show-help nil)
+  (completions-header-format "")
   (completions-max-height 30)
   (completions-format 'one-column)
+  (completions-detailed t)
+  (completion-eager-display nil)
+  (completion-eager-update t)
 
   (imenu-flatten nil)
   (imenu-max-items 100)
@@ -139,7 +143,7 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
         '(("\\*Completions\\*"
            (display-buffer-reuse-window display-buffer-in-side-window)
            (side . bottom)
-           (window-height . 30)
+           (window-height . completions--fit-window-to-buffer)
            (window-parameters . ((no-other-window . t))))))
 
   (setq-default truncate-lines nil)
@@ -174,6 +178,8 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
   (find-file-not-found-functions . adh--create-parent-dir-on-the-fly)
   (text-mode . visual-line-mode)
   (diff-mode . (lambda () (setq-local show-trailing-whitespace t)))
+  (completion-list-mode . (lambda () (display-line-numbers-mode -1)))
+  (completion-setup . adh--completions-preselect-first)
   (before-save . delete-trailing-whitespace))
 
 (provide 'adh-emacs)

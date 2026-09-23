@@ -1,12 +1,12 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-(defun adh-set-completion-backend (backend)
-  "Switch the completion backend."
-  (interactive (list (intern (completing-read "Select backend: " '(company corfu)))))
+(defun adh-set-completion-ui (ui)
+  "Switch the in-buffer completion UI."
+  (interactive (list (intern (completing-read "Select completion UI: " '(company corfu)))))
   (when (bound-and-true-p global-corfu-mode) (global-corfu-mode 0))
   (when (bound-and-true-p global-company-mode) (global-company-mode 0))
-  (setq adh-completion-backend backend)
-  (message "[adh] Completion backend set to %s" backend))
+  (setq adh-completion-ui ui)
+  (message "[adh] Completion UI set to %s" ui))
 
 (defun adh-complete-at-point ()
   "Complete at point: trigger company manually if active, else `completion-at-point'."
@@ -16,22 +16,22 @@
     (completion-at-point)))
 
 (defun adh--cmp-auto-p ()
-  "Return non-nil when automatic popup completion is on for the active backend."
-  (cond ((eq adh-completion-backend 'company)
+  "Return non-nil when automatic popup completion is on for the active UI."
+  (cond ((eq adh-completion-ui 'company)
          (bound-and-true-p global-company-mode))
-        ((eq adh-completion-backend 'corfu)
+        ((eq adh-completion-ui 'corfu)
          (bound-and-true-p global-corfu-mode))))
 
 (defun adh--set-cmp-auto (on)
-  "Turn automatic popup completion for the active backend ON or off."
+  "Turn automatic popup completion for the active UI ON or off."
   (let ((arg (if on 1 -1)))
-    (cond ((eq adh-completion-backend 'company)
+    (cond ((eq adh-completion-ui 'company)
            (global-company-mode arg))
-          ((eq adh-completion-backend 'corfu)
+          ((eq adh-completion-ui 'corfu)
            (global-corfu-mode arg)))))
 
 (defun adh-toggle-cmp-auto ()
-  "Toggle automatic popup completion for the active backend."
+  "Toggle automatic popup completion for the active UI."
   (interactive)
   (adh--set-cmp-auto (not (adh--cmp-auto-p))))
 
@@ -70,24 +70,19 @@
   (setq corfu-bar-width 0.0 corfu-right-margin-width 0.0)
   (put 'corfu--bar 'corfu--bmp nil)
 
-  (with-eval-after-load 'savehist
-      (add-to-list 'savehist-additional-variables 'corfu-history))
-
   (corfu-echo-mode 1)
-  (corfu-history-mode 1)
   (corfu-popupinfo-mode 1))
 
 (use-package cape
   :ensure t
   :config
-  (defalias 'cape-dabbrev-no-ann (cape-capf-properties #'cape-dabbrev :annotation-function (lambda (_cand) "")))
-  (defalias 'cape-file-no-ann (cape-capf-properties #'cape-file :annotation-function (lambda (_cand) "")))
-  (defalias 'cape-history-no-ann (cape-capf-properties #'cape-history :annotation-function (lambda (_cand) "")))
-  (add-hook 'completion-at-point-functions #'cape-dabbrev-no-ann)
-  (add-hook 'completion-at-point-functions #'cape-file-no-ann)
-  (add-hook 'completion-at-point-functions #'cape-history-no-ann)
-  (with-eval-after-load 'eglot
-    (advice-add #'eglot-completion-at-point :around #'cape-wrap-buster)))
+  (defalias 'adh-cape-keyword-dabbrev-no-ann
+    (cape-capf-properties (cape-capf-super #'cape-keyword #'cape-dabbrev) :annotation-function #'ignore))
+  (defalias 'adh-cape-file-no-ann (cape-capf-properties #'cape-file :annotation-function #'ignore))
+  (add-hook 'completion-at-point-functions #'adh-cape-keyword-dabbrev-no-ann)
+  (add-hook 'completion-at-point-functions #'adh-cape-file-no-ann)
+  (add-hook 'eglot-managed-mode-hook
+            (lambda () (add-hook 'completion-at-point-functions #'adh-cape-file-no-ann nil t))))
 
 (use-package kind-icon
   :ensure t

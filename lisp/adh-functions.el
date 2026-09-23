@@ -638,6 +638,33 @@ A numeric suffix is added as needed to avoid overwriting."
   (select-window (get-buffer-window "*Completions*" t))
   (isearch-forward))
 
+(defun adh--prescient-remember (candidate)
+  "Record CANDIDATE with prescient, when prescient is loaded."
+  (when (and candidate (fboundp 'prescient-remember))
+    (prescient-remember candidate)))
+
+(defun adh-completion-choose ()
+  "Choose the selected *Completions* candidate, or the first one, and record it."
+  (interactive)
+  (let ((candidate (with-minibuffer-completions-window
+                     (unless (get-text-property (point) 'completion--string)
+                       (first-completion))
+                     (car (completion-list-candidate-at-point)))))
+    (minibuffer-choose-completion)
+    (adh--prescient-remember candidate)))
+
+(defun adh--completions-key (cmd)
+  "Return a binding that runs CMD while the *Completions* list is visible.
+Otherwise the key keeps its usual binding."
+  `(menu-item "" ,cmd :filter ,(lambda (c) (and (minibuffer--completions-visible) c))))
+
+(defun adh--completions-preselect-first ()
+  "Treat the first *Completions* candidate as selected, so the next key moves past it."
+  (with-current-buffer standard-output
+    (when (get-text-property (point-min) 'mouse-face)
+      (let ((inhibit-read-only t))
+        (put-text-property (point-min) (1+ (point-min)) 'first-completion t)))))
+
 (defun adh-isearch-occur ()
   "Run `occur' on the current isearch and exit isearch."
   (interactive)

@@ -406,12 +406,12 @@ The remaining BODY is bindings as in `adh-keymap-set'."
 ;;; packages
 
 (adh-keymap-set completion-in-region-mode-map
-  ("<return>" #'minibuffer-choose-completion)
-  ("<tab>" #'minibuffer-choose-completion)
-  ("C-<return>" #'minibuffer-choose-completion)
-  ("C-s" #'adh-completion-in-region-isearch)
-  ("C-a" #'minibuffer-next-completion)
-  ("C-e" #'minibuffer-previous-completion))
+  ("<return>" (adh--completions-key #'adh-completion-choose))
+  ("<tab>" (adh--completions-key #'adh-completion-choose))
+  ("C-<return>" (adh--completions-key #'adh-completion-choose))
+  ("C-s" (adh--completions-key #'adh-completion-in-region-isearch))
+  ("C-a" (adh--completions-key #'minibuffer-next-completion))
+  ("C-e" (adh--completions-key #'minibuffer-previous-completion)))
 
 (adh-keymap-set Buffer-menu-mode-map
   ("<return>" #'Buffer-menu-other-window)

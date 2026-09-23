@@ -11,8 +11,8 @@ Set to nil if you want to define your own layout from scratch."
   :type '(choice (const :tag "Use AdHoc Custom Layout" t)
                  (const :tag "Disable (Write Your Own)" nil)))
 
-(defcustom adh-completion-backend 'company
-  "In-buffer completion backend to use: `company' or `corfu'."
+(defcustom adh-completion-ui 'company
+  "In-buffer completion UI to use: `company' or `corfu'."
   :group 'adhoc
   :type '(choice (const :tag "Corfu" corfu)
                  (const :tag "Company" company)))
