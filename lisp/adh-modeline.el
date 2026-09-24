@@ -54,10 +54,9 @@
 (defconst adh--ml-cap-r "")
 
 (defconst adh--segment-modal-state-alist
-  '((normal . ("N" . font-lock-variable-name-face))
-    (insert . ("I" . font-lock-string-face))
-    (motion . ("M" . font-lock-variable-name-face))))
-
+  '((normal . ("N" . font-lock-function-name-face))
+    (insert . ("I" . warning))
+    (motion . ("M" . homoglyph))))
 
 (defun adh--ml-cap (glyph fg bg)
   "Render cap GLYPH in color FG against background BG."
@@ -193,22 +192,30 @@
 
 (defun adh--segment-file ()
   "Return the buffer name, carrying whether it can be, or has been, edited."
-  (propertize
-   (adh--ml-escape (buffer-name))
-   'face (if (mode-line-window-selected-p)
-             `(:foreground ,(if (and buffer-file-name (buffer-modified-p))
-                                adh--ml-warn
-                              adh--ml-accent)
-               :weight bold
-               :slant ,(if buffer-read-only 'italic 'normal))
-           'adh-mode-line-buffer-id-inactive)
-   'mouse-face 'mode-line-highlight
-   'help-echo (concat "Buffer name"
-                      (cond (buffer-read-only " (read-only)")
-                            ((buffer-modified-p) " (modified)")
-                            (t ""))
-                      "\nmouse-1: Previous buffer\nmouse-3: Next buffer")
-   'local-map mode-line-buffer-identification-keymap))
+  (let ((active (mode-line-window-selected-p)))
+    (propertize
+     (concat
+      (propertize (adh--ml-escape (buffer-name))
+                  'face (if active
+                            `(:foreground ,adh--ml-accent
+                              :weight bold
+                              :slant ,(if buffer-read-only 'italic 'normal))
+                          'adh-mode-line-buffer-id-inactive))
+      (when buffer-file-name
+        (let ((face (list '(:height 0.8)
+                          (if active
+                              `(:foreground ,adh--ml-warn)
+                            'adh-mode-line-buffer-id-inactive))))
+          (if (buffer-modified-p)
+              (propertize "•" 'face face 'display '(raise 0.15))
+            (propertize " " 'face face)))))
+     'mouse-face 'mode-line-highlight
+     'help-echo (concat "Buffer name"
+                        (cond (buffer-read-only " (read-only)")
+                              ((buffer-modified-p) " (modified)")
+                              (t ""))
+                        "\nmouse-1: Previous buffer\nmouse-3: Next buffer")
+     'local-map mode-line-buffer-identification-keymap)))
 
 (defun adh--ml-set-coding-system (event)
   "Prompt for this buffer's coding system, as \\[set-buffer-file-coding-system]."
@@ -276,7 +283,7 @@
                        (concat "@" host)
                      (concat method ":" host)))))
       (propertize label
-                  'face `(:foreground ,(if root adh--ml-warn adh--ml-fg))
+                  'face `(:foreground ,(if root adh--ml-warn adh--ml-muted))
                   'mouse-face 'mode-line-highlight
                   'help-echo (format "Remote file\nmethod: %s\nhost: %s\nuser: %s"
                                      (or method "?") host (or user "(default)"))))))
@@ -442,7 +449,7 @@
   "Minor modes that have a segment of their own, or none worth showing.")
 
 (defun adh--ml-active-minor-modes ()
-  "Return the lighters of enabled minor modes, trimmed, empties dropped."
+  "Return (MODE . LIGHTER) for the enabled minor modes that show a lighter."
   (let (out)
     (dolist (entry minor-mode-alist (nreverse out))
       (let ((sym (car entry)))
@@ -452,7 +459,7 @@
                  (lighter (if (consp tail) (car tail) tail))
                  (s (string-trim (adh--ml-literal lighter))))
             (unless (string-empty-p s)
-              (push s out))))))))
+              (push (cons sym s) out))))))))
 
 (defvar-local adh--ml-minors-expanded nil
   "When non-nil, list the minor mode lighters instead of counting them.")
@@ -473,31 +480,56 @@
   (let ((m (make-sparse-keymap)))
     (define-key m [mode-line mouse-1] #'adh--ml-click-minor-modes)
     m)
-  "Keymap on the minor mode segment.")
+  "Keymap on the minor mode toggle.")
+
+(defun adh--ml-minor-mode-at (event)
+  "Return the minor mode whose lighter EVENT is on, or nil."
+  (when-let* ((obj (posn-string (event-start event))))
+    (get-text-property (cdr obj) 'adh--ml-minor-mode (car obj))))
+
+(defun adh--ml-minor-mode-menu (event)
+  "Show the menu of the minor mode whose lighter was clicked."
+  (interactive "@e")
+  (when-let* ((mode (adh--ml-minor-mode-at event)))
+    (minor-mode-menu-from-indicator mode (posn-window (event-start event)) event)))
+
+(defun adh--ml-minor-mode-help (event)
+  "Describe the minor mode whose lighter was clicked."
+  (interactive "@e")
+  (when-let* ((mode (adh--ml-minor-mode-at event)))
+    (describe-minor-mode-from-symbol (or (get mode :minor-mode-function) mode))))
+
+(defvar adh--ml-minor-mode-map
+  (let ((m (make-sparse-keymap)))
+    (define-key m [mode-line down-mouse-1] #'adh--ml-minor-mode-menu)
+    (define-key m [mode-line mouse-2] #'adh--ml-minor-mode-help)
+    m)
+  "Keymap on each minor mode lighter.")
 
 (defun adh--segment-minor-modes ()
-  "Return the minor modes: a count when contracted, the list when expanded."
+  "Return the minor mode count, or dots and the lighters when expanded.
+The count or the dots toggle the list; a lighter opens its mode's menu."
   (let ((modes (adh--ml-active-minor-modes)))
     (when modes
-      (let ((s (if adh--ml-minors-expanded
-                   (mapconcat (lambda (m)
-                                (propertize (downcase m)
-                                            'face `(:foreground ,adh--ml-fg)))
-                              modes
-                              " ")
-                 (propertize (format "⋯%d" (length modes))
-                             'face `(:foreground ,adh--ml-muted)))))
-        (add-text-properties
-         0 (length s)
-         (list 'mouse-face 'mode-line-highlight
-               'help-echo (concat (number-to-string (length modes))
-                                  " minor modes:\n  "
-                                  (mapconcat #'identity modes "\n  ")
-                                  "\n\nmouse-1: "
-                                  (if adh--ml-minors-expanded "contract" "expand"))
-               'local-map adh--ml-minors-map)
-         s)
-        s))))
+      (let ((toggle (propertize
+                     (if adh--ml-minors-expanded "⋯" (format "⋯%d" (length modes)))
+                     'face `(:foreground ,adh--ml-muted)
+                     'mouse-face 'mode-line-highlight
+                     'help-echo (if adh--ml-minors-expanded "mouse-1: contract" "mouse-1: expand")
+                     'local-map adh--ml-minors-map)))
+        (if (not adh--ml-minors-expanded)
+            toggle
+          (concat toggle " "
+                  (mapconcat
+                   (lambda (mode)
+                     (propertize (downcase (cdr mode))
+                                 'face `(:foreground ,adh--ml-fg)
+                                 'mouse-face 'mode-line-highlight
+                                 'help-echo (format "%s\nmouse-1: Display minor mode menu\nmouse-2: Show help for minor mode"
+                                                    (car mode))
+                                 'adh--ml-minor-mode (car mode)
+                                 'local-map adh--ml-minor-mode-map))
+                   modes " ")))))))
 
 (defun adh--segment-flymake ()
   "Return flymake's non-zero counters, or a quiet check when the buffer is clean."
