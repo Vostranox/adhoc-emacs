@@ -19,12 +19,16 @@ FD_DIR="$EMACS_DIR/opt/fd"
 THEMES_DIR="$EMACS_DIR/themes"
 SITE_LISP_DIR="$EMACS_DIR/site-lisp"
 
+pull_ff() {
+    git -C "$1" pull --ff-only || echo "[adh][warning] skipping update of '$1'" >&2
+}
+
 clone_or_update() {
     local url="$1"
     local dir
     dir="$SITE_LISP_DIR/$(basename "$url" .git)"
     if [[ -d "$dir/.git" ]]; then
-        git -C "$dir" pull --ff-only
+        pull_ff "$dir"
     else
         git clone "$url" "$dir"
     fi
@@ -32,14 +36,14 @@ clone_or_update() {
 
 mkdir -p "$THEMES_DIR"
 if [[ -d "$THEMES_DIR/gruber-material-dark/.git" ]]; then
-    git -C "$THEMES_DIR/gruber-material-dark" pull --ff-only
+    pull_ff "$THEMES_DIR/gruber-material-dark"
 else
     git clone https://github.com/Vostranox/gruber-material-dark.git "$THEMES_DIR/gruber-material-dark"
 fi
 
 mkdir -p "$FD_DIR"
 if [[ -d "$FD_DIR/.git" ]]; then
-    git -C "$FD_DIR" pull --ff-only
+    pull_ff "$FD_DIR"
 else
     git clone -b simple_sort_by_depth https://github.com/Vostranox/fd.git "$FD_DIR"
 fi
