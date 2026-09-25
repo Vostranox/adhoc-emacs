@@ -120,7 +120,8 @@
                     (unless (string= (buffer-name) final-name)
                       (rename-buffer final-name t)))
                   (when (fboundp 'zoxide-add)
-                    (zoxide-add)))))
+                    (zoxide-add))))
+  (dired-mode . (lambda () (display-line-numbers-mode -1))))
 
 (use-package wdired
   :ensure nil
