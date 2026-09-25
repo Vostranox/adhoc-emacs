@@ -160,6 +160,7 @@ The remaining BODY is bindings as in `adh-keymap-set'."
   ("C-h" #'mark-word)
   ("C-o" (=> (adh--minibuffer-pivot #'recentf-open)) "recentf-open")
   ("M-o" (=> (adh--minibuffer-pivot #'zoxide-travel)) "zoxide-travel")
+  ("M-e" #'adh-consult-dirs-pivot)
   ("M-a" #'embark-export)
   ("C-x C-b" (=> (adh--minibuffer-pivot #'list-buffers)) "list-buffers"))
 
@@ -190,6 +191,7 @@ The remaining BODY is bindings as in `adh-keymap-set'."
   ("o" #'adh-consult-fd-directories-here)
   ("h" #'adh-consult-fd-project)
   ("a" #'adh-consult-fd-directories-project)
+  ("e" #'adh-consult-fd-dirs)
   ("," #'adh-get-executable)
   ("." #'adh-consult-locate)
   ("/" #'adh-getenv))
@@ -200,6 +202,7 @@ The remaining BODY is bindings as in `adh-keymap-set'."
   ("f" #'adh-consult-ripgrep-here)
   ("o" #'adh-consult-imenu)
   ("h" #'adh-consult-ripgrep-project)
+  ("e" #'adh-consult-ripgrep-dirs)
   ("a" #'adh-consult-line-with-region))
 
 (adh-defkeymap adh-replace-keymap

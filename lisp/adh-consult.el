@@ -84,6 +84,29 @@
   (interactive)
   (adh--consult-fd-directories default-directory))
 
+(defun adh-consult-fd-dirs (&optional initial)
+  "Find files in several directories, read as a comma-separated list.
+INITIAL is the initial search input."
+  (interactive)
+  (consult-fd '(4) initial))
+
+(defun adh-consult-ripgrep-dirs (&optional initial)
+  "Grep in several directories, read as a comma-separated list.
+INITIAL is the initial search input."
+  (interactive)
+  (consult-ripgrep '(4) initial))
+
+(defun adh-consult-dirs-pivot ()
+  "Rerun the current fd or ripgrep search in chosen directories, keeping the input."
+  (interactive)
+  (let ((input (minibuffer-contents-no-properties))
+        (command (pcase (minibuffer-prompt)
+                   ((rx bos "Fd") #'adh-consult-fd-dirs)
+                   ((rx bos "Ripgrep") #'adh-consult-ripgrep-dirs)
+                   (_ (user-error "Not in a consult fd or ripgrep search")))))
+    (run-with-idle-timer adh--minibuffer-pivot-delay nil command input)
+    (abort-recursive-edit)))
+
 (defun adh-consult-ripgrep-here ()
   "Grep below `default-directory'."
   (interactive)
