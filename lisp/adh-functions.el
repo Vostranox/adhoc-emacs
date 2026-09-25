@@ -410,18 +410,39 @@ the most recently used window is kept."
             (setq count (1+ count))))))
     (message "Killed %d buffer(s)." count)))
 
-(defun adh-copy-file-name ()
-  "Copy the current buffer's file name (or buffer name) to the kill ring."
-  (interactive)
-  (if-let* ((f (adh--buffer-file-name)))
+(defun adh--dired-marked-files ()
+  "Return the files explicitly marked in Dired, or nil when none are."
+  (when (derived-mode-p 'dired-mode)
+    (let ((files (dired-get-marked-files nil nil nil t)))
+      (cond ((eq (car files) t) (cdr files))
+            ((cdr files) files)))))
+
+(defun adh--copy-marked (files)
+  "Copy FILES to the kill ring, separated by spaces, and return the string."
+  (let ((str (mapconcat #'identity files " ")))
+    (kill-new str)
+    (message "Copied %d files: %s" (length files) str)
+    str))
+
+(defun adh-copy-file-name (&optional marked)
+  "Copy the current buffer's file name (or buffer name) to the kill ring.
+With MARKED (non-nil interactively), copy the names of the files marked
+in Dired instead, when there are any."
+  (interactive (list t))
+  (let (files f)
+    (cond
+     ((setq files (and marked (adh--dired-marked-files)))
+      (adh--copy-marked (mapcar #'file-name-nondirectory files)))
+     ((setq f (adh--buffer-file-name))
       (let ((name (file-name-nondirectory f)))
         (kill-new name)
         (message "Copied %s" name)
-        name)
-    (let ((name (buffer-name)))
-      (kill-new name)
-      (message "Copied buffer name %s" name)
-      name)))
+        name))
+     (t
+      (let ((name (buffer-name)))
+        (kill-new name)
+        (message "Copied buffer name %s" name)
+        name)))))
 
 (defun adh-copy-path (&optional resolve)
   "Copy the current file's directory to the kill ring.
@@ -434,15 +455,19 @@ With RESOLVE (prefix arg), follow symlinks."
     (message "Copied %s" path)
     path))
 
-(defun adh-copy-full-path (&optional resolve)
+(defun adh-copy-full-path (&optional resolve marked)
   "Copy the current file's full path to the kill ring.
-With RESOLVE (prefix arg), follow symlinks."
-  (interactive "P")
-  (let* ((file (or (adh--buffer-file-name) default-directory))
-         (path (adh--maybe-truename (expand-file-name file) resolve)))
-    (kill-new path)
-    (message "Copied %s" path)
-    path))
+With RESOLVE (prefix arg), follow symlinks.  With MARKED (non-nil
+interactively), copy the paths of the files marked in Dired instead,
+when there are any."
+  (interactive (list current-prefix-arg t))
+  (if-let* ((files (and marked (adh--dired-marked-files))))
+      (adh--copy-marked (mapcar (lambda (f) (adh--maybe-truename f resolve)) files))
+    (let* ((file (or (adh--buffer-file-name) default-directory))
+           (path (adh--maybe-truename (expand-file-name file) resolve)))
+      (kill-new path)
+      (message "Copied %s" path)
+      path)))
 
 (defun adh--dired-sort-toggle-or-edit-windows ()
   "Like `dired-sort-toggle-or-edit', but force the external ls.
