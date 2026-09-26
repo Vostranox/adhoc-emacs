@@ -12,7 +12,7 @@
 (adh-require! 'adh-eglot)
 (adh-require! 'adh-ext-packages)
 (adh-require! 'adh-completion)
-(adh-require! 'adh-setup)
+(adh-require! 'adh-settings)
 (adh-require! 'adh-minibuffer)
 (adh-require! 'adh-prog-modes)
 (adh-require! 'adh-consult)

@@ -1,5 +1,8 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(require 'adh-vars)
+(require 'adh-functions)
+
 (defun adh-mc-keyboard-quit-dwim ()
   "Exit multiple-cursors if active, otherwise `adh-keyboard-quit-dwim'."
   (interactive)
@@ -13,17 +16,20 @@
   (avy-goto-line)
   (back-to-indentation))
 
-(defun adh-set-use-dirvish (on)
-  "Open Dired buffers in Dirvish when ON is non-nil, else in plain Dired.
-Interactively, toggle.  Buffers already open keep their current look."
-  (interactive (list (not adh-use-dirvish)))
+(defun adh--apply-use-dirvish (on)
+  "Open new Dired buffers in Dirvish when ON, else in plain Dired."
   (when (and on (not (fboundp 'dirvish-override-dired-mode)))
     (user-error "Dirvish is not installed"))
-  (setq adh-use-dirvish on)
   (cond (on (dirvish-override-dired-mode 1))
         ((bound-and-true-p dirvish-override-dired-mode)
-         (dirvish-override-dired-mode -1)))
-  (message "[adh] Dirvish %s" (if on "enabled" "disabled")))
+         (dirvish-override-dired-mode -1))))
+
+(defun adh-switch-dired-dwim ()
+  "Jump through Dirvish history if in use, else switch to a Dired buffer."
+  (interactive)
+  (call-interactively (if (and adh-use-dirvish (fboundp 'dirvish-history-jump))
+                          #'dirvish-history-jump
+                        #'adh-switch-dired-buffer)))
 
 (use-package zoxide
   :ensure t
@@ -96,9 +102,6 @@ Interactively, toggle.  Buffers already open keep their current look."
   :custom
   (wgrep-auto-save-buffer t))
 
-(use-package windower
-  :ensure t :defer 5)
-
 (use-package rainbow-mode
   :ensure t :defer t
   :custom
@@ -127,5 +130,15 @@ Interactively, toggle.  Buffers already open keep their current look."
   :config
   (put 'popper-popup-status 'permanent-local t)
   (popper-mode 1))
+
+(use-package string-inflection
+  :ensure t :defer t)
+
+(use-package gruber-material-dark
+  :vc (:url "https://github.com/Vostranox/gruber-material-dark")
+  :demand t
+  :config
+  (unless (custom-theme-enabled-p 'gruber-material-dark-intense)
+    (load-theme 'gruber-material-dark-intense :no-confirm)))
 
 (provide 'adh-ext-packages)

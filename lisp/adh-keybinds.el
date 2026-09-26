@@ -1,13 +1,22 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(require 'adh-vars)
+
+(defvar meow-update-cursor-functions-alist)
+(defvar meow-normal-state-keymap)
+(defvar vertico-multiform-map)
+(defvar org-agenda-mode-map)
+(defvar magit-mode-map)
+(defvar magit-blame-mode-map)
+(defvar ibuffer-mode-map)
+
 (defmacro => (&rest body)
   "Wrap BODY in an anonymous interactive command, for inline keybindings."
   `(lambda () (interactive) ,@body))
 
 (defmacro adh-keymap-set (keymap &rest bindings)
   "Bind keys in KEYMAP.
-Each element of BINDINGS is (KEY DEFINITION) or (KEY DEFINITION NAME),
-where NAME is an optional which-key label."
+Each binding is (KEY DEF) or (KEY DEF NAME), NAME being a which-key label."
   (declare (indent 1))
   `(progn
      ,@(mapcan
@@ -45,6 +54,20 @@ The remaining BODY is bindings as in `adh-keymap-set'."
            `((adh-keymap-set ,parent
                (,key ,name ,@(and label (list label)))))))))
 
+;;; override map
+
+(defvar-keymap adh-override-map
+  "C-d" #'other-window
+  "C-o" #'recentf-open
+  "M-o" #'zoxide-travel)
+
+(define-minor-mode adh-override-mode
+  "Keep `adh-override-map' above every major and minor mode map."
+  :global t :init-value t)
+
+(add-to-list 'emulation-mode-map-alists `((adh-override-mode . ,adh-override-map)))
+(add-hook 'minibuffer-setup-hook (lambda () (setq-local adh-override-mode nil)))
+
 ;;; global map
 
 (adh-keymap-set global-map
@@ -53,15 +76,13 @@ The remaining BODY is bindings as in `adh-keymap-set'."
 ;; C
 (adh-keymap-set global-map
   ("C-l" #'recenter-top-bottom)
-  ("C-d" #'other-window)
   ("C-b" #'adh-select-popup)
-  ("C-n" #'consult-isearch-history)
   ("C-r" #'adh-isearch-backward-with-region)
   ("C-t" #'adh-keyboard-quit-dwim)
   ("C-s" #'adh-isearch-forward-with-region)
+  ("C-S-s" #'consult-isearch-history)
   ("C-g" #'adh-keyboard-quit-dwim)
   ("C-f" #'adh-complete-at-point)
-  ("C-o" #'recentf-open)
   ("C-u" #'clipboard-yank)
   ("C-S-u" #'consult-yank-pop)
   ("C-h" #'mark-word)
@@ -77,15 +98,12 @@ The remaining BODY is bindings as in `adh-keymap-set'."
 
 ;; M
 (adh-keymap-set global-map
-  ("M-r" #'point-to-register)
   ("M-t" #'transpose-words)
-  ("M-o" #'zoxide-travel)
   ("M-u" #'indent-region)
   ("M-h" #'previous-buffer)
   ("M-a" #'adh-move-lines-down)
   ("M-e" #'adh-move-lines-up)
   ("M-i" #'next-buffer)
-  ("M-p" #'adh-project-switch-to-dired)
   ("M-," #'xref-go-back)
   ("M-." #'xref-find-definitions)
   ("M-/" #'xref-find-references)
@@ -97,15 +115,13 @@ The remaining BODY is bindings as in `adh-keymap-set'."
   ("C-M-f" #'downcase-dwim)
   ("C-M-o" #'capitalize-dwim)
   ("C-M-u" #'upcase-dwim)
-  ("C-M-." #'adh-apropos))
+  ("C-M-i" #'string-inflection-elixir-style-cycle))
 
 ;; C-c
 (adh-keymap-set global-map
   ("C-c f" #'mc/edit-beginnings-of-lines)
   ("C-c o" #'mc/mark-all-dwim)
-  ("C-c u" #'mc/insert-numbers)
-  ("C-c A" #'org-agenda)
-  ("C-c E" #'org-capture))
+  ("C-c u" #'mc/insert-numbers))
 
 ;; C-c C
 (adh-keymap-set global-map
@@ -115,34 +131,19 @@ The remaining BODY is bindings as in `adh-keymap-set'."
 
 ;; C-c C-t
 (adh-keymap-set global-map
-  ("C-c C-t f" #'adh-toggle-eglot-flymake)
-  ("C-c C-t o" #'consult-flymake)
-  ("C-c C-t h" #'adh-toggle-cmp-auto)
-  ("C-c C-t a" #'adh-toggle-eglot-global)
-  ("C-c C-t e" #'adh-toggle-eglot-format-on-save)
-  ("C-c C-t i" #'adh-subword-toggle)
-  ("C-c C-t v" #'adh-toggle-vc-mode)
-  ("C-c C-t ." #'adh-toggle-ide-mode)
-  ("C-c C-t /" #'adh-toggle-func-case-at-point))
+  ("C-c C-t i" #'adh-toggle-subwords))
 
 ;; C-x
 (adh-keymap-set global-map
-  ("C-x d" (=> (call-interactively (if (and adh-use-dirvish (fboundp 'dirvish-history-jump))
-                                        #'dirvish-history-jump
-                                      #'adh-switch-dired-buffer)))
-   "dirvish-history-jump")
+  ("C-x d" #'adh-switch-dired-dwim)
   ("C-x b" #'switch-to-buffer)
   ("C-x j" (=> (find-file (adh--get-project-dir))) "find-file-project-root")
   ("C-x f" #'find-file-at-point)
   ("C-x h" #'mark-whole-buffer)
-  ("C-x x i" #'insert-buffer)
-  ("C-x ," #'next-error)
-  ("C-x ." #'previous-error))
+  ("C-x ." #'adh-settings))
 
 ;; C-x C
 (adh-keymap-set global-map
-  ("C-x C-b" #'list-buffers)
-  ("C-x C-w" #'write-file)
   ("C-x C-f" #'find-file)
   ("C-x C-j" #'dired-jump)
   ("C-x C-h" #'mark-whole-buffer))
@@ -163,13 +164,13 @@ The remaining BODY is bindings as in `adh-keymap-set'."
   ("C-h" #'mark-word)
   ("C-o" (=> (adh--minibuffer-pivot #'recentf-open)) "recentf-open")
   ("M-o" (=> (adh--minibuffer-pivot #'zoxide-travel)) "zoxide-travel")
-  ("M-e" #'adh-consult-dirs-pivot)
-  ("M-a" #'embark-export)
-  ("C-x C-b" (=> (adh--minibuffer-pivot #'list-buffers)) "list-buffers"))
+  ("M-d" #'adh-consult-dirs-pivot)
+  ("M-a" #'embark-export))
 
 (adh-keymap-set minibuffer-local-shell-command-map
   ("C-a" #'adh-minibuffer-next-history-or-clear)
-  ("C-e" #'previous-history-element))
+  ("C-e" #'previous-history-element)
+  ("M-d" #'adh-shell-command-dir-pivot))
 
 (adh-defkeymap adh-consult-flymake-map
   ("M-a" #'adh-consult-flymake-show-buffer-diagnostics))
@@ -180,7 +181,6 @@ The remaining BODY is bindings as in `adh-keymap-set'."
   :map global-map
   :prefix "C-x C-o"
   ("l" #'tab-switch)
-  ("d" #'adh-jump-to-register)
   ("c" #'adh-switch-to-buffer)
   ("b" #'bookmark-jump)
   ("x" #'adh-toggle-meow-motion-mode)
@@ -194,7 +194,6 @@ The remaining BODY is bindings as in `adh-keymap-set'."
   ("o" #'adh-consult-fd-directories-here)
   ("h" #'adh-consult-fd-project)
   ("a" #'adh-consult-fd-directories-project)
-  ("e" #'adh-consult-fd-dirs)
   ("," #'adh-get-executable)
   ("." #'adh-consult-locate)
   ("/" #'adh-getenv))
@@ -203,10 +202,8 @@ The remaining BODY is bindings as in `adh-keymap-set'."
   :map adh-leader-map
   :prefix "t"
   ("f" #'adh-consult-ripgrep-here)
-  ("o" #'consult-imenu)
   ("h" #'adh-consult-ripgrep-project)
-  ("e" #'adh-consult-ripgrep-dirs)
-  ("a" #'adh-consult-line-with-region))
+  ("a" #'consult-imenu))
 
 (adh-defkeymap adh-replace-keymap
   :map adh-leader-map
@@ -230,21 +227,12 @@ The remaining BODY is bindings as in `adh-keymap-set'."
 (adh-defkeymap adh-magit-keymap
   :map adh-leader-map
   :prefix "m"
-  ("SPC" #'adh-magit-log-trace-region-or-line)
-  ("c" #'magit-find-file)
-  ("s" #'magit-file-checkout)
-  ("m" #'magit)
-  ("j" #'magit-file-dispatch)
-  ("f" #'adh-toggle-magit-blame)
-  ("o" #'adh-magit-log-buffer-file-follow)
-  ("y" #'magit-dispatch)
-  ("h" #'adh-magit-staging-quick)
-  ("a" #'magit-log-current)
-  ("e" #'magit-checkout)
-  ("i" #'adh-switch-magit-buffer)
-  ("," #'magit-git-command-topdir)
-  ("." #'magit-status-quick)
-  ("/" #'adh-magit-restore-current))
+  ("c" #'adh-switch-magit-buffer)
+  ("o" #'magit-find-file)
+  ("f" #'magit-file-dispatch)
+  ("h" #'magit-dispatch)
+  ("a" #'adh-magit-status-dwim)
+  ("e" #'adh-magit-staging-quick))
 
 (adh-defkeymap adh-file-keymap
   :map adh-leader-map
@@ -261,15 +249,11 @@ The remaining BODY is bindings as in `adh-keymap-set'."
   ("d" #'adh-delete-other-windows)
   ("c" #'delete-window)
   ("n" #'balance-windows)
-  ("r" #'windower-toggle-split)
+  ("r" #'window-layout-transpose)
   ("t" #'split-window-vertically)
-  ("T" #'adh-split-below-root)
   ("s" #'split-window-horizontally)
-  ("S" #'adh-split-right-root)
   ("w" #'window-swap-states)
   ("m" #'popper-toggle)
-  ("a" #'popper-cycle)
-  ("e" #'popper-cycle-backwards)
   ("x" #'adh-popup-toggle-type))
 
 (adh-defkeymap adh-buffer-keymap
@@ -285,7 +269,6 @@ The remaining BODY is bindings as in `adh-keymap-set'."
   ("x" #'ediff-buffers)
   ("m" #'eval-buffer)
   ("w" #'eval-region)
-  ("h" #'ibuffer)
   ("a" #'scratch-buffer))
 
 (adh-defkeymap adh-tab-keymap
@@ -301,13 +284,6 @@ The remaining BODY is bindings as in `adh-keymap-set'."
   ("c" #'bookmark-delete)
   ("r" #'bookmark-rename)
   ("s" #'bookmark-set))
-
-(adh-defkeymap adh-tmux-keymap
-  :map adh-leader-map
-  :prefix "z"
-  ("h" #'adh-tmux-to-emacs-buffer)
-  ("a" #'adh-tmux-to-emacs-buffer-all)
-  ("e" #'adh-tmux-cd))
 
 ;;; modal mode
 
@@ -423,10 +399,7 @@ The remaining BODY is bindings as in `adh-keymap-set'."
   ("<return>" #'Buffer-menu-other-window)
   ("<backspace>" (=> (adh--with-saved-window #'Buffer-menu-other-window)))
   ("+" #'beginning-of-buffer)
-  ("-" #'end-of-buffer)
-  ("C-d" #'other-window)
-  ("C-o" #'recentf)
-  ("M-o" #'zoxide-travel))
+  ("-" #'end-of-buffer))
 
 (with-eval-after-load 'vertico
   (adh-keymap-set vertico-multiform-map
@@ -445,28 +418,17 @@ The remaining BODY is bindings as in `adh-keymap-set'."
 
 (with-eval-after-load 'completion-preview
   (adh-keymap-set completion-preview-active-mode-map
-    ("<return>" #'completion-preview-insert)
     ("<tab>" #'completion-preview-insert)
-    ("C-<return>" #'completion-preview-insert)
+    ("M-f" #'completion-preview-insert-word)
     ("C-a" #'completion-preview-next-candidate)
-    ("C-e" #'completion-preview-previous-candidate)))
-
-(with-eval-after-load 'company
-  (adh-keymap-set company-active-map
-    ("<return>" #'company-complete-selection)
-    ("<tab>" #'company-complete-selection)
-    ("C-<return>" #'company-complete-selection)
-    ("C-a" #'company-select-next)
-    ("C-e" #'company-select-previous)))
+    ("C-e" #'completion-preview-prev-candidate)))
 
 (with-eval-after-load 'corfu
   (adh-keymap-set corfu-map
-    ("<return>" #'corfu-insert)
-    ("<tab>" #'corfu-insert)
     ("C-SPC" #'corfu-insert-separator)
-    ("C-<return>" #'corfu-insert)
     ("C-a" #'corfu-next)
-    ("C-e" #'corfu-previous)))
+    ("C-e" #'corfu-previous)
+    ("C-h" #'corfu-popupinfo-toggle)))
 
 (with-eval-after-load 'multiple-cursors
   (adh-keymap-set mc/keymap
@@ -490,9 +452,7 @@ The remaining BODY is bindings as in `adh-keymap-set'."
     ("s" #'adh-dired-sort-toggle-or-edit)
     ("h" #'dired-up-directory)
     ("i" #'dired-find-file)
-    ("C-o" #'recentf-open)
     ("C-," #'adh-dired-duplicate-dwim)
-    ("M-o" #'zoxide-travel)
     ("M-a" #'dired-toggle-read-only)))
 
 (with-eval-after-load 'dirvish
@@ -529,18 +489,14 @@ The remaining BODY is bindings as in `adh-keymap-set'."
     ("-" #'end-of-buffer)
     ("." #'previous-error-no-select)
     ("," #'next-error-no-select)
-    ("l" #'clipboard-kill-ring-save)
-    ("C-o" #'recentf-open)
-    ("M-o" #'zoxide-travel))
+    ("l" #'clipboard-kill-ring-save))
 
   (adh-keymap-set compilation-button-map
     ("<backspace>" #'compilation-display-error)))
 
 (with-eval-after-load 'flymake
   (adh-keymap-set flymake-diagnostics-buffer-mode-map
-    ("<backspace>" #'adh-flymake-display-diagnostic)
-    ("C-o" #'recentf-open)
-    ("M-o" #'zoxide-travel)))
+    ("<backspace>" #'adh-flymake-display-diagnostic)))
 
 (with-eval-after-load 'grep
   (adh-keymap-set grep-mode-map
@@ -557,8 +513,6 @@ The remaining BODY is bindings as in `adh-keymap-set'."
     ("<backspace>" #'occur-mode-display-occurrence)
     ("." #'previous-error-no-select)
     ("," #'next-error-no-select)
-    ("C-o" #'recentf-open)
-    ("M-o" #'zoxide-travel)
     ("M-a" #'occur-edit-mode))
 
   (adh-keymap-set occur-edit-mode-map
@@ -574,10 +528,7 @@ The remaining BODY is bindings as in `adh-keymap-set'."
 
 (with-eval-after-load 'shell
   (adh-keymap-set shell-command-mode-map
-    ("q" (=> (quit-window t)) "quit-window")
-    ("C-d" #'other-window)
-    ("C-o" #'recentf)
-    ("M-o" #'zoxide-travel)))
+    ("q" (=> (quit-window t)) "quit-window")))
 
 (with-eval-after-load 'magit
   (adh-keymap-set magit-mode-map
@@ -614,19 +565,24 @@ The remaining BODY is bindings as in `adh-keymap-set'."
 
 (with-eval-after-load 'diff-hl
   (adh-keymap-set diff-hl-mode-map
-    ("C-M-f" #'diff-hl-diff-goto-hunk)
-    ("C-M-o" #'diff-hl-show-hunk-ediff)
+    ("C-M-d" #'diff-hl-ediff-current-hunk)
     ("C-M-a" #'diff-hl-next-hunk)
-    ("C-M-e" #'diff-hl-previous-hunk)
-    ("C-M-h" #'diff-hl-show-hunk)))
+    ("C-M-e" #'diff-hl-previous-hunk)))
 
 (with-eval-after-load 'ibuffer
   (adh-keymap-set ibuffer-mode-map
     ("<return>" #'ibuffer-visit-buffer-other-window)
     ("<backspace>" #'ibuffer-visit-buffer-other-window-noselect)
-    ("i" #'ibuffer-visit-buffer)
-    ("C-d" #'other-window)
-    ("C-o" #'recentf)
-    ("M-o" #'zoxide-travel)))
+    ("i" #'ibuffer-visit-buffer)))
+
+;;; repeat
+
+(with-eval-after-load 'diff-hl
+  (defvar-keymap adh-diff-hl-repeat-map
+    :repeat t
+    "a" #'diff-hl-next-hunk
+    "e" #'diff-hl-previous-hunk))
+
+(repeat-mode 1)
 
 (provide 'adh-keybinds)

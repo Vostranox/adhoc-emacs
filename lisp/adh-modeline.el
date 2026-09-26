@@ -150,7 +150,7 @@
 (declare-function adh--get-project-dir "adh-project" (&optional dir))
 
 (defvar-local adh--ml-project-root 'unset
-  "This buffer's project root as a directory, nil for none, `unset' if unasked.")
+  "Project root directory, nil if none, `unset' if not looked up yet.")
 
 (defun adh--ml-note-project (&optional allow-remote)
   "Resolve and cache this buffer's project root."
@@ -254,7 +254,7 @@
                   'face `(:foreground ,adh--ml-fg)))))
 
 (defun adh--segment-encoding ()
-  "Return the coding system, with the line ending after a slash when unusual."
+  "Return the coding system, plus the line ending when not unix."
   (let* ((coding (adh--segment-coding))
          (eol (adh--segment-eol))
          (body (cond ((and coding eol)
@@ -295,7 +295,7 @@
                                      (or method "?") host (or user "(default)"))))))
 
 (defun adh--segment-position ()
-  "Return row:col and how far the cursor is through the buffer, as a percentage."
+  "Return row:col and the position through the buffer in percent."
   (let* ((rowcol (format-mode-line '((line-number-mode "%l")
                                      (column-number-mode ":%c"))))
          (span (- (point-max) (point-min)))
@@ -389,7 +389,7 @@
   "Cons of (EPOCH . STATE) for this buffer.")
 
 (defun adh--ml-lsp-server-covers-p ()
-  "Return non-nil when some running eglot server's project contains this file."
+  "Return non-nil if a running eglot server's project contains this file."
   (and (boundp 'eglot--servers-by-project)
        default-directory
        (not (file-remote-p default-directory))
@@ -430,7 +430,7 @@
     s))
 
 (defun adh--segment-lsp ()
-  "Return the LSP indicator: white when this buffer is managed, dim otherwise."
+  "Return the LSP indicator, bright when this buffer is managed."
   (pcase (adh--ml-lsp-state)
     ('managed
      (let ((extra (and (boundp 'eglot-mode-line-format)
@@ -512,8 +512,8 @@
   "Keymap on each minor mode lighter.")
 
 (defun adh--segment-minor-modes ()
-  "Return the minor mode count, or dots and the lighters when expanded.
-The count or the dots toggle the list; a lighter opens its mode's menu."
+  "Return the minor mode count, or the lighters when expanded.
+The count toggles the list; a lighter opens its mode's menu."
   (let ((modes (adh--ml-active-minor-modes)))
     (when modes
       (let ((toggle (propertize
@@ -537,7 +537,7 @@ The count or the dots toggle the list; a lighter opens its mode's menu."
                    modes " ")))))))
 
 (defun adh--segment-flymake ()
-  "Return flymake's non-zero counters, or a quiet check when the buffer is clean."
+  "Return flymake's non-zero counters, or a check mark when clean."
   (when (and (bound-and-true-p flymake-mode)
              (boundp 'flymake-mode-line-format))
     (let* ((s (format-mode-line (symbol-value 'flymake-mode-line-format)))
@@ -565,7 +565,7 @@ The count or the dots toggle the list; a lighter opens its mode's menu."
               tick)))))))
 
 (defun adh--segment-tooling ()
-  "LSP state and flymake's verdict as one reading, or nil when neither runs."
+  "Return the LSP state and flymake counters together, or nil."
   (let ((lsp (adh--segment-lsp))
         (fly (adh--segment-flymake)))
     (cond ((and lsp fly)
@@ -580,7 +580,7 @@ The count or the dots toggle the list; a lighter opens its mode's menu."
   (adh--ml-sub (adh--segment-major-mode) (adh--segment-minor-modes)))
 
 (defun adh--ml-right ()
-  "Build the right island: where the buffer came from and what the tooling says."
+  "Build the right island: tooling, remote, encoding and project."
   (when (mode-line-window-selected-p)
     (let ((parts (delq nil (list (adh--segment-tooling)
                                  (adh--segment-remote)
@@ -605,11 +605,11 @@ The count or the dots toggle the list; a lighter opens its mode's menu."
   (and (active-minibuffer-window) t))
 
 (defun adh--ml-width (part)
-  "Return the columns PART occupies once the mode line collapses its escapes."
+  "Return the display width of PART after mode line escapes."
   (string-width (format-mode-line part)))
 
 (defun adh--ml-compose ()
-  "Assemble the mode line: main island, transparent gap, right island if any."
+  "Assemble the mode line: left island, gap, right island."
   (let ((left  (adh--ml-left))
         (right (adh--ml-right)))
     (if (not right)

@@ -1,5 +1,7 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(defvar vertico-multiform-commands)
+
 (use-package vertico
   :ensure t
   :init
@@ -29,9 +31,7 @@
   (completion-styles '(orderless basic))
   (completion-category-overrides '((file (styles orderless partial-completion))))
   :config
-  ;; consult appends an invisible "tofu" char to each candidate to keep them
-  ;; unique.  A trailing "$" in a pattern would anchor before that char and never
-  ;; match, so this dispatcher rewrites "...$" to also allow the tofu suffix.
+  ;; Let a trailing "$" match before consult's invisible tofu suffix.
   (with-eval-after-load 'consult
     (defun adh--orderless-dollar-tofu-dispatcher (pattern _index _total)
       "Make a trailing \"$\" in PATTERN tolerate consult's tofu suffix char."
@@ -49,8 +49,7 @@
   (completion-preview-sort-function #'prescient-completion-sort)
   (completions-sort #'prescient-completion-sort)
   :config
-  ;; Same tofu problem as above, but for prescient's own regexps: let any "$"
-  ;; anchor sit before consult's invisible suffix char instead of the true end.
+  ;; Same for prescient's regexps.
   (define-advice prescient-filter-regexps
       (:filter-return (regexps) tofu-tolerant)
     (let ((tofu (concat (if (boundp 'consult--tofu-regexp)

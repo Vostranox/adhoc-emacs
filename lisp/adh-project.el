@@ -1,11 +1,13 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(require 'adh-vars)
+
 (autoload 'project-prompt-project-dir "project" nil t)
 
+(defvar adh--command-origin-dir)
+
 (defun adh--get-project-dir (&optional dir)
-  "Return the project root above DIR (or `default-directory'), or nil.
-A project is the nearest ancestor containing one of
-`adh-project-root-markers'."
+  "Return the nearest ancestor of DIR with one of `adh-project-root-markers'."
   (locate-dominating-file (or dir default-directory)
    (lambda (d)
      (seq-some (lambda (marker)
@@ -13,7 +15,7 @@ A project is the nearest ancestor containing one of
                adh-project-root-markers))))
 
 (defun adh--project-try (&optional dir)
-  "Project.el backend: return the project containing DIR as a transient project."
+  "Project.el backend: return DIR's project as a transient project."
   (when-let* ((root (adh--get-project-dir dir)))
     (cons 'transient (expand-file-name root))))
 
@@ -21,7 +23,8 @@ A project is the nearest ancestor containing one of
   "Run `compile' from the project root, or `default-directory' if none."
   (interactive)
   (if-let* ((proj-dir (adh--get-project-dir)))
-      (let ((default-directory proj-dir))
+      (let ((adh--command-origin-dir default-directory)
+            (default-directory proj-dir))
         (call-interactively #'compile))
     (call-interactively #'compile)))
 
@@ -34,24 +37,24 @@ A project is the nearest ancestor containing one of
     (compile (buffer-substring-no-properties start end))))
 
 (defun adh-project-async-shell-command ()
-  "Run `async-shell-command' from the project root, or `default-directory' if none."
+  "Run `async-shell-command' from the project root, or here if none."
   (interactive)
   (if-let* ((proj-dir (adh--get-project-dir)))
-      (let ((default-directory proj-dir))
+      (let ((adh--command-origin-dir default-directory)
+            (default-directory proj-dir))
         (call-interactively #'async-shell-command))
     (call-interactively #'async-shell-command)))
 
-(defun adh-project-switch-to-dired ()
-  "Prompt for a known project and open its root in Dired, remembering it."
-  (interactive)
-  (let* ((root (file-name-as-directory
-                (expand-file-name (project-prompt-project-dir))))
-         (proj (cons 'transient root)))
-    (ignore-errors (project-remember-project proj))
-    (let ((default-directory root))
-      (if (fboundp 'project-dired)
-          (call-interactively #'project-dired)
-        (dired default-directory)))))
+(define-advice read-shell-command (:filter-args (args) adh-show-dir)
+  "Say where compile and shell commands run: the project root or a path."
+  (let ((prompt (car args)))
+    (when (member prompt '("Compile command: " "Async shell command: " "Shell command: "))
+      (setcar args (format-message
+                    "%s in %s: " (string-remove-suffix ": " prompt)
+                    (if (equal (adh--get-project-dir) default-directory)
+                        "project"
+                      (format-message "`%s'" (abbreviate-file-name default-directory))))))
+    args))
 
 (use-package project
   :ensure nil :defer t

@@ -1,5 +1,7 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(require 'adh-functions)
+
 (defun adh-toggle-meow-motion-mode ()
   "Switch between meow normal and motion states."
   (interactive)

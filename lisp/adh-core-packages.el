@@ -1,5 +1,9 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(require 'adh-functions)
+
+(defvar adh--vc-enabled nil)
+
 (define-advice register-val-jump-to (:around (orig val arg) adh-no-file-query-prompt)
   (if (and (consp val) (eq (car val) 'file-query))
       (cl-letf (((symbol-function 'y-or-n-p) #'always))
@@ -7,13 +11,13 @@
     (funcall orig val arg)))
 
 (defun adh--rename-isearch-occur-buffer (&rest _)
-  "Rename the *Occur* buffer after `isearch-occur' to include the search string."
+  "Name the `isearch-occur' buffer after the search string."
   (when (get-buffer "*Occur*")
     (with-current-buffer "*Occur*"
       (rename-buffer (format "*s-occur: %s*" isearch-string) t))))
 
 (defun adh--isearch-with-region (forward)
-  "Start isearch in FORWARD direction, pre-filled with the active region if any."
+  "Start isearch in FORWARD direction, seeded with the region."
   (if (use-region-p)
       (let ((search-string (buffer-substring-no-properties (region-beginning) (region-end))))
         (deactivate-mark)
@@ -31,44 +35,22 @@
   (interactive)
   (adh--isearch-with-region nil))
 
-(defun adh-enable-vc ()
-  "Turn the built-in VC backends and `global-diff-hl-mode' on."
-  (interactive)
-  (setq vc-handled-backends '(RCS CVS SVN SCCS SRC Bzr Git Hg))
-  (dolist (buf (buffer-list))
-    (with-current-buffer buf
-      (when (and buffer-file-name
-                 (not (file-remote-p buffer-file-name)))
-        (ignore-errors (vc-refresh-state)))))
-  (when (require 'diff-hl nil t)
-    (global-diff-hl-mode 1))
-  (setq adh--vc-enabled t))
-
-(defun adh-disable-vc ()
-  "Disable all built-in VC backends and `global-diff-hl-mode'."
-  (interactive)
-  (setq adh--vc-enabled nil)
-  (setq vc-handled-backends nil)
-  (when (bound-and-true-p global-diff-hl-mode)
-    (global-diff-hl-mode -1)))
-
-(defun adh-toggle-vc-mode ()
-  "Toggle the built-in VC backends on or off."
-  (interactive)
-  (if adh--vc-enabled
-      (adh-disable-vc)
-    (adh-enable-vc)))
-
-(defun adh-clear-register (reg)
-  "Delete a single register REG, prompting with the register preview."
-  (interactive (list (register-read-with-preview "Clear register: ")))
-  (setq register-alist (assq-delete-all reg register-alist)))
-
-(defun adh-clear-all-registers ()
-  "Empty all registers."
-  (interactive)
-  (setq register-alist nil)
-  (message "All registers cleared"))
+(defun adh--apply-vc (on)
+  "Turn the built-in VC backends and `global-diff-hl-mode' ON or off."
+  (setq adh--vc-enabled (and on t))
+  (if on
+      (progn
+        (setq vc-handled-backends '(RCS CVS SVN SCCS SRC Bzr Git Hg))
+        (dolist (buf (buffer-list))
+          (with-current-buffer buf
+            (when (and buffer-file-name
+                       (not (file-remote-p buffer-file-name)))
+              (ignore-errors (vc-refresh-state)))))
+        (when (require 'diff-hl nil t)
+          (global-diff-hl-mode 1)))
+    (setq vc-handled-backends nil)
+    (when (bound-and-true-p global-diff-hl-mode)
+      (global-diff-hl-mode -1))))
 
 (defun adh-switch-dired-buffer ()
   "Switch to a Dired buffer."
@@ -160,12 +142,6 @@
   (recentf-max-menu-items 10)
   (recentf-max-saved-items 5000)
   :config
-  (defun recentf-open ()
-    "Open a recently visited file (overrides the built-in menu-style command).
-Already-open files just switch to their buffer.  Marginalia annotates the
-candidates as files because `recentf-open' is in `marginalia-command-categories'."
-    (interactive)
-    (find-file (completing-read "Open: " (mapcar #'abbreviate-file-name recentf-list) nil t)))
   (recentf-mode 1))
 
 (use-package vc
@@ -175,10 +151,23 @@ candidates as files because `recentf-open' is in `marginalia-command-categories'
   :custom
   (auto-revert-check-vc-info nil)
   :config
-  (defvar adh--vc-enabled nil)
   (add-to-list 'minor-mode-alist '(adh--vc-enabled adh--vc-mode-line-name)))
 
 (use-package transient)
+
+(use-package glasses
+  :ensure nil :defer t
+  :custom
+  (glasses-separate-parentheses-p nil))
+
+(define-globalized-minor-mode adh-global-glasses-mode glasses-mode
+  (lambda () (when (derived-mode-p 'prog-mode) (glasses-mode 1)))
+  :group 'adhoc)
+
+(defun adh--apply-subwords (on)
+  "Turn subword motion and display ON or off in all buffers."
+  (global-subword-mode (if on 1 -1))
+  (adh-global-glasses-mode (if on 1 -1)))
 
 (use-package ediff
   :ensure nil :defer t
@@ -191,5 +180,8 @@ candidates as files because `recentf-open' is in `marginalia-command-categories'
   (ediff-keymap-setup . (lambda ()
                           (keymap-set ediff-mode-map "," #'ediff-next-difference)
                           (keymap-set ediff-mode-map "." #'ediff-previous-difference))))
+
+(adh--apply-vc adh-use-vc)
+(adh--apply-subwords adh-subwords)
 
 (provide 'adh-core-packages)

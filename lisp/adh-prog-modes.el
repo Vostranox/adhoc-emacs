@@ -1,5 +1,7 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(require 'adh-vars)
+
 (use-package treesit-auto
   :ensure t
   :custom
@@ -17,7 +19,7 @@
   (c-ts-mode . (lambda () (setq-local comment-start "// ") (setq-local comment-end ""))))
 
 (defun adh--treesit-no-error-face ()
-  "Don't paint tree-sitter ERROR nodes red, so incomplete code isn't a wall of error-face."
+  "Don't paint tree-sitter ERROR nodes; incomplete code isn't an error."
   (treesit-font-lock-recompute-features nil '(error)))
 
 (use-package rust-ts-mode
@@ -74,8 +76,7 @@
 (use-package yaml-mode :ensure t :defer t)
 (use-package zig-mode :ensure t :defer t)
 
-;; Drop each major mode's local keymap so the global AdHoc/meow bindings win
-;; uniformly, instead of being shadowed by mode-specific keys.
+;; Drop mode keymaps so global and meow bindings always win.
 (dolist (hook '(prog-mode-hook nxml-mode-hook markdown-mode-hook markdown-ts-mode-hook))
   (add-hook hook (lambda () (use-local-map nil))))
 

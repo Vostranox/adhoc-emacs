@@ -1,19 +1,16 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(require 'adh-vars)
+(require 'adh-functions)
+
+(defvar ns-use-proxy-icon)
+
 (defun adh--create-parent-dir-on-the-fly ()
-  "Create the visited file's parent directory if it is missing.
-Hooked into `find-file-not-found-functions' so new files in new folders just work."
+  "Create a missing parent directory for the visited file."
   (let ((dir (file-name-directory buffer-file-name)))
     (when (and dir (not (file-exists-p dir)))
       (make-directory dir t)))
   nil)
-
-(use-package gruber-material-dark
-  :vc (:url "https://github.com/Vostranox/gruber-material-dark")
-  :demand t
-  :config
-  (unless (custom-theme-enabled-p 'gruber-material-dark-intense)
-    (load-theme 'gruber-material-dark-intense :no-confirm)))
 
 (use-package emacs
   :ensure nil
@@ -130,11 +127,11 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
     (setq ns-use-proxy-icon nil)
     (add-to-list 'default-frame-alist '(ns-appearance . dark))
     (add-to-list 'default-frame-alist '(ns-transparent-titlebar . t)))
-  (adh-set-window-decoration adh-window-decoration)
-  (adh-set-frame-opacity adh-frame-opacity)
+  (adh--apply-window-decoration adh-window-decoration)
+  (adh--apply-frame-opacity adh-frame-opacity)
   (setq frame-title-format nil)
 
-  (adh-set-font adh-mono-spaced-font adh-mono-spaced-font-size)
+  (adh--apply-font-settings)
 
   (adh-add-to-path "~/bin")
 
@@ -150,7 +147,7 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
   (setq switch-to-prev-buffer-skip
         (lambda (_window buf _bury-or-kill) (not (adh--buffer-listable-p buf))))
 
-  (advice-add 'read-buffer-to-switch :filter-args #'(lambda (args) (list "Switch to: ")))
+  (advice-add 'read-buffer-to-switch :filter-args (lambda (_args) (list "Switch to: ")))
 
   (define-advice list-buffers--refresh (:after (&rest _) adh-minimal)
     (setq tabulated-list-format
@@ -174,8 +171,6 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
   (winner-mode 1)
   :hook
   (emacs-startup . (lambda () (tab-bar-rename-tab "dev") (message "[adh] Activated %d packages in %s" (length package-activated-list) (emacs-init-time))))
-  ;; Always use the default sexp motion, ignoring any mode-installed
-  ;; `forward-sexp-function' (e.g. tree-sitter's).
   (after-init . (lambda () (advice-add #'forward-sexp :around (lambda (orig &rest args) (let ((forward-sexp-function nil)) (apply orig args))))))
   (find-file-not-found-functions . adh--create-parent-dir-on-the-fly)
   (text-mode . visual-line-mode)

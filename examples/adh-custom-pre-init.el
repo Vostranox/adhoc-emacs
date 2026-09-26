@@ -6,7 +6,14 @@
 
 (setq adh-use-custom-keybinds nil)
 
-(setq adh-completion-ui 'corfu)
+(setq adh-completion-style 'minimal)
+(setq adh-completion-ui 'popup)
+(setq adh-completion-keys 'tab-only)
+(setq adh-use-lsp nil)
+(setq adh-lsp-diagnostics nil)
+(setq adh-lsp-format-on-save nil)
+(setq adh-use-vc nil)
+(setq adh-subwords nil)
 
 (setq adh-use-dirvish nil)
 

@@ -1,10 +1,12 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(require 'adh-functions)
+
 (eval-when-compile
   (when (bound-and-true-p byte-compile-current-file)
     (require 'magit)))
 
-;; A trimmed magit-status that shows only the staging-relevant sections.
+;; magit-status with only the staging sections.
 (define-derived-mode magit-staging-mode magit-status-mode "magit-staging"
   "Like `magit-status-mode' but limited to staged/unstaged changes."
   :group 'magit-status)
@@ -17,7 +19,7 @@
     (magit-insert-staged-changes)))
 
 (defun adh--magit-show-commit-current-file (orig-fun &rest args)
-  "Advice for `magit-show-commit': when blaming, limit the diff to the current file."
+  "Advice for `magit-show-commit': limit the diff to the blamed file."
   (if (and (null (nth 2 args))
            (or (bound-and-true-p magit-blame-mode)
                (bound-and-true-p magit-blame-read-only-mode))
@@ -36,8 +38,7 @@
   (magit-setup-buffer #'magit-staging-mode #'magit-staging-refresh-buffer))
 
 (defun adh-magit-staging-quick ()
-  "Show an existing staging buffer if one is hidden, else open a fresh one.
-With a prefix arg, always open a fresh one."
+  "Show a hidden staging buffer or open one; a prefix arg forces a new one."
   (interactive)
   (require 'magit)
   (if-let* ((buffer
@@ -48,7 +49,7 @@ With a prefix arg, always open a fresh one."
     (adh-magit-staging)))
 
 (defun adh-magit-show-commit-original ()
-  "Show the full commit at point, bypassing the blame file-narrowing advice."
+  "Show the full commit at point, bypassing the blame narrowing."
   (interactive)
   (let ((had (advice-member-p #'adh--magit-show-commit-current-file
                               'magit-show-commit)))
@@ -61,7 +62,7 @@ With a prefix arg, always open a fresh one."
         (advice-add 'magit-show-commit :around #'adh--magit-show-commit-current-file)))))
 
 (defun adh-magit-restore-current ()
-  "Discard uncommitted changes in the current file (git restore), then revert it."
+  "Discard uncommitted changes to this file (git restore) and revert it."
   (interactive)
   (require 'magit)
   (let ((path (adh-copy-full-path)))
@@ -76,6 +77,12 @@ With a prefix arg, always open a fresh one."
   (interactive)
   (adh-switch-buffer-of-mode 'magit-status-mode "Magit: "))
 
+(defun adh-magit-status-dwim ()
+  "Show this repo's status without refreshing, else prompt for a repo."
+  (interactive)
+  (require 'magit)
+  (call-interactively (if (magit-toplevel) #'magit-status-quick #'magit-status)))
+
 (defun adh-magit-visit-file-dwim (&optional other-window)
   "Visit the worktree file from staged file headings, otherwise as usual.
 With a prefix argument OTHER-WINDOW, display the buffer in another window."
@@ -85,9 +92,7 @@ With a prefix argument OTHER-WINDOW, display the buffer in another window."
     (magit-diff-visit-file other-window)))
 
 (defun adh-magit-visit-thing-other-window ()
-  "Visit the thing at point in another window.
-Dispatches to whatever RET would visit for the section at point
-\(file, commit, stash, branch, ...) but displays it in another window."
+  "Visit whatever RET would visit at point, in another window."
   (interactive)
   (let ((cmd (key-binding (kbd "RET"))))
     (cond ((eq cmd #'adh-magit-visit-file-dwim)
@@ -99,7 +104,7 @@ Dispatches to whatever RET would visit for the section at point
              (call-interactively (or cmd #'magit-visit-thing)))))))
 
 (defun adh-magit-preview-thing ()
-  "Visit the thing at point in another window but keep point in this window."
+  "Visit the thing at point in another window, keeping point here."
   (interactive)
   (save-selected-window
     (adh-magit-visit-thing-other-window)))
@@ -174,5 +179,15 @@ Dispatches to whatever RET would visit for the section at point
                                                     what
                                                   (format "%s: %s" kind what))
                                                 t)))))))
+
+(with-eval-after-load 'magit-files
+  (transient-replace-suffix 'magit-file-dispatch 'magit-log-trace-definition
+    '("t" "Trace" adh-magit-log-trace-region-or-line))
+  (transient-replace-suffix 'magit-file-dispatch 'magit-log-buffer-file
+    '("l" "Log" adh-magit-log-buffer-file-follow :if-not-derived dired-mode))
+  (transient-replace-suffix 'magit-file-dispatch 'magit-blame-addition
+    '("b" "Blame" adh-toggle-magit-blame))
+  (transient-append-suffix 'magit-file-dispatch ", c"
+    '(", R" "Restore" adh-magit-restore-current)))
 
 (provide 'adh-magit)
