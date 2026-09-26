@@ -1,61 +1,72 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-(autoload 'project-prompt-project-dir "project" nil t)
+(require 'adh-functions)
 
-(defun adh--get-project-dir (&optional dir)
-  "Return the project root above DIR (or `default-directory'), or nil.
-A project is the nearest ancestor containing one of
-`adh-project-root-markers'."
-  (locate-dominating-file (or dir default-directory)
-   (lambda (d)
-     (seq-some (lambda (marker)
-                 (file-exists-p (file-name-concat d marker)))
-               adh-project-root-markers))))
+(declare-function project-try-vc "project" (dir))
 
 (defun adh--project-try (&optional dir)
-  "Project.el backend: return the project containing DIR as a transient project."
+  "Project.el backend: DIR's project, Git-backed if its root has a .git dir."
   (when-let* ((root (adh--get-project-dir dir)))
-    (cons 'transient (expand-file-name root))))
+    (or (and (file-directory-p (expand-file-name ".git" root))
+             (let ((vc-handled-backends '(Git)))
+               (project-try-vc root)))
+        (cons 'transient (expand-file-name root)))))
 
-(defun adh-project-compile ()
-  "Run `compile' from the project root, or `default-directory' if none."
+(defun adh--run-with-region (command dir)
+  "Run COMMAND from DIR, starting its prompt with the active region, if any."
+  (let* ((region (and (use-region-p)
+                      (buffer-substring-no-properties (region-beginning) (region-end))))
+         (adh--command-origin-dir default-directory)
+         (default-directory dir)
+         (adh--shell-prompt-dir dir))
+    (minibuffer-with-setup-hook
+        (lambda ()
+          (when region
+            (delete-minibuffer-contents)
+            (insert region)))
+      (call-interactively command))))
+
+(defun adh-compile-region ()
+  "Compile from `default-directory', starting with the active region."
   (interactive)
-  (if-let* ((proj-dir (adh--get-project-dir)))
-      (let ((default-directory proj-dir))
-        (call-interactively #'compile))
-    (call-interactively #'compile)))
+  (adh--run-with-region #'compile default-directory))
 
-(defun adh-project-compile-region (start end)
-  "Run the region START..END as a compile command from the project root."
-  (interactive "r")
-  (if-let* ((proj-dir (adh--get-project-dir)))
-      (let ((default-directory proj-dir))
-        (compile (buffer-substring-no-properties start end)))
-    (compile (buffer-substring-no-properties start end))))
-
-(defun adh-project-async-shell-command ()
-  "Run `async-shell-command' from the project root, or `default-directory' if none."
+(defun adh-async-shell-command-region ()
+  "Run an async shell command from `default-directory', with the active region."
   (interactive)
-  (if-let* ((proj-dir (adh--get-project-dir)))
-      (let ((default-directory proj-dir))
-        (call-interactively #'async-shell-command))
-    (call-interactively #'async-shell-command)))
+  (adh--run-with-region #'async-shell-command default-directory))
 
-(defun adh-project-switch-to-dired ()
-  "Prompt for a known project and open its root in Dired, remembering it."
+(defun adh-project-compile-region ()
+  "Compile from the project root, starting with the active region."
   (interactive)
-  (let* ((root (file-name-as-directory
-                (expand-file-name (project-prompt-project-dir))))
-         (proj (cons 'transient root)))
-    (ignore-errors (project-remember-project proj))
-    (let ((default-directory root))
-      (if (fboundp 'project-dired)
-          (call-interactively #'project-dired)
-        (dired default-directory)))))
+  (adh--run-with-region #'compile (or (adh--get-project-dir) default-directory)))
+
+(defun adh-project-async-shell-command-region ()
+  "Run an async shell command from the project root, with the active region."
+  (interactive)
+  (adh--run-with-region #'async-shell-command (or (adh--get-project-dir) default-directory)))
+
+(defun adh--dir-label (dir)
+  "Name DIR like consult prompts do: \"Project NAME\" at a root, else the path."
+  (let ((root (adh--get-project-dir dir)))
+    (if (and root (file-equal-p root dir))
+        (concat "Project " (file-name-nondirectory (directory-file-name root)))
+      (directory-file-name (abbreviate-file-name dir)))))
+
+(define-advice read-shell-command (:filter-args (args) adh-dir-label)
+  "Label the prompt with `adh--shell-prompt-dir' when an adh command sets it."
+  (when-let* ((dir adh--shell-prompt-dir)
+              (base (pcase (car args)
+                      ("Compile command: " "Compile")
+                      ("Async shell command: " "Async shell")
+                      ("Shell command: " "Shell"))))
+    (setcar args (format "%s (%s): " base (adh--dir-label dir))))
+  args)
 
 (use-package project
   :ensure nil :defer t
   :config
-  (setq project-find-functions #'adh--project-try))
+  (setq project-find-functions #'adh--project-try)
+  (cl-defmethod project-external-roots ((_project (head vc))) nil))
 
 (provide 'adh-project)

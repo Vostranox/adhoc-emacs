@@ -93,13 +93,11 @@ pacman -S --needed --noconfirm \
     pkgconf \
     texinfo
 
-# CRLF checkouts break the build.
-git config --global core.autocrlf false
-
 if [[ -d "$SRC_DIR/.git" ]]; then
+    git -C "$SRC_DIR" config core.autocrlf false
     git -C "$SRC_DIR" pull --ff-only
 else
-    git clone --depth 1 https://github.com/emacs-mirror/emacs "$SRC_DIR"
+    git clone -c core.autocrlf=false --depth 1 https://github.com/emacs-mirror/emacs "$SRC_DIR"
 fi
 
 cd "$SRC_DIR"

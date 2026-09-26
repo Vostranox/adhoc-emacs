@@ -8,8 +8,8 @@
 
 set -euo pipefail
 
-SRC_DIR="${SRC_DIR:-$HOME/probe/emacs}"
 APP_DIR="${APP_DIR:-/Applications}"
+SRC_DIR="${SRC_DIR:-$HOME/probe/emacs}"
 JOBS="${JOBS:-$(sysctl -n hw.ncpu)}"
 
 usage() {

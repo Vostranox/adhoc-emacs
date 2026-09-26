@@ -1,15 +1,36 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-(use-package treesit-auto
-  :ensure t
+(require 'adh-vars)
+
+(defvar treesit-language-source-alist)
+
+(declare-function treesit-auto--build-treesit-source-alist "treesit-auto")
+
+(defun adh-treesit-ensure-grammars ()
+  "Install the missing grammars in `adh-treesit-ensured-langs', skipping failures."
+  (interactive)
+  (require 'treesit-auto)
+  (let ((treesit-language-source-alist (treesit-auto--build-treesit-source-alist)))
+    (dolist (lang adh-treesit-ensured-langs)
+      (unless (treesit-language-available-p lang)
+        (with-demoted-errors "[adh] %S" (treesit-install-language-grammar lang))))))
+
+(use-package treesit-auto :ensure t :defer t)
+
+(use-package treesit
+  :ensure nil
   :custom
-  (treesit-auto-install t)
+  (treesit-auto-install-grammar 'always)
   :config
-  (dolist (lang adh-treesit-excluded-langs)
-    (setq treesit-auto-langs (remove lang treesit-auto-langs)))
+  (setq treesit--install-language-grammar-out-dir-history
+        (list (no-littering-expand-var-file-name "treesit/")))
   (add-to-list 'treesit-language-source-alist
                '(zig "https://github.com/tree-sitter-grammars/tree-sitter-zig"))
-  (global-treesit-auto-mode 1))
+  (add-to-list 'treesit-major-mode-remap-alist '(zig-mode . zig-ts-mode))
+  (add-to-list 'treesit-major-mode-remap-alist '(glsl-mode . glsl-ts-mode))
+  (customize-set-variable 'treesit-enabled-modes
+                          (seq-difference (mapcar #'cdr treesit-major-mode-remap-alist)
+                                          adh-treesit-excluded-modes)))
 
 (use-package c-ts-mode
   :ensure nil :defer t
@@ -17,7 +38,7 @@
   (c-ts-mode . (lambda () (setq-local comment-start "// ") (setq-local comment-end ""))))
 
 (defun adh--treesit-no-error-face ()
-  "Don't paint tree-sitter ERROR nodes red, so incomplete code isn't a wall of error-face."
+  "Don't paint tree-sitter ERROR nodes; incomplete code isn't an error."
   (treesit-font-lock-recompute-features nil '(error)))
 
 (use-package rust-ts-mode
@@ -45,38 +66,25 @@
   :hook
   (shader-mode . (lambda () (modify-syntax-entry ?_ "_"))))
 
-(use-package glsl-mode
-  :ensure t :defer t
-  :init
-  (with-eval-after-load 'c-ts-mode
-    (unless (fboundp 'c-ts-mode--simple-indent-rules)
-      (defun c-ts-mode--simple-indent-rules (mode style)
-        (let ((c-ts-mode-indent-style style))
-          (c-ts-mode--get-indent-style mode))))))
-
 (use-package slang-ts-mode
-  :vc (:url "https://github.com/Vostranox/slang-ts-mode")
-  :mode ("\\.slang\\'" "\\.slangh\\'"))
+  :vc (:url "https://github.com/Vostranox/slang-ts-mode" :rev :newest)
+  :defer t)
 
 (use-package hlsl-ts-mode
-  :vc (:url "https://github.com/Vostranox/hlsl-ts-mode")
-  :mode ("\\.hlsl\\'" "\\.hlsli\\'"))
+  :vc (:url "https://github.com/Vostranox/hlsl-ts-mode" :rev :newest)
+  :defer t)
 
 (use-package clang-format :ensure t :defer t)
 (use-package cmake-mode :ensure t :defer t)
+(use-package glsl-mode :ensure t :defer t)
 (use-package go-mode :ensure t :defer t)
 (use-package haskell-mode :ensure t :defer t)
 (use-package json-mode :ensure t :defer t)
 (use-package powershell :ensure t :defer t)
-(use-package rust-mode :ensure t)
+(use-package rust-mode :ensure t :defer t)
 (use-package swift-mode :ensure t :defer t)
 (use-package typescript-mode :ensure t :defer t)
 (use-package yaml-mode :ensure t :defer t)
 (use-package zig-mode :ensure t :defer t)
-
-;; Drop each major mode's local keymap so the global AdHoc/meow bindings win
-;; uniformly, instead of being shadowed by mode-specific keys.
-(dolist (hook '(prog-mode-hook nxml-mode-hook markdown-mode-hook markdown-ts-mode-hook))
-  (add-hook hook (lambda () (use-local-map nil))))
 
 (provide 'adh-prog-modes)

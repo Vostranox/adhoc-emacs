@@ -1,7 +1,33 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(require 'adh-meow)
+
+;;; global map
+
+(keymap-set global-map "C-c w" #'whitespace-mode)
+(keymap-set global-map "C-c d" (cons "insert-date" (=> (insert (format-time-string "%F")))))
+
+;;; override map
+
+(keymap-set adh-override-map "C-;" #'avy-goto-char-timer)
+
+;;; leader map
+
+(adh-defkeymap adh-leader-map
+  :map global-map
+  :prefix "C-x C-o")
+
+(adh-defkeymap adh-org-keymap
+  :map adh-leader-map
+  :prefix "o"
+  "a" #'org-agenda
+  "c" #'org-capture
+  "l" #'org-store-link)
+
+;;; modal mode
+
 (with-eval-after-load 'meow
-  (keymap-set global-map "C-x t" meow-normal-state-keymap)
+  (keymap-set global-map "C-x C-z" meow-normal-state-keymap)
 
   (meow-define-keys 'normal
     (cons "SPC" adh-leader-map)
@@ -39,7 +65,7 @@
     '("d" . adh-meow-insert)
     '("f" . adh-meow-insert-replace)
     '("g g" . consult-goto-line)
-    (cons "g h" (=> (avy-goto-line) (back-to-indentation)))
+    '("g h" . adh-avy-goto-line-indent)
 
     '("z" . kill-word)
     '("x" . kill-whole-line)

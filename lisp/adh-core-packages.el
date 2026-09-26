@@ -1,5 +1,7 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(require 'adh-functions)
+
 (define-advice register-val-jump-to (:around (orig val arg) adh-no-file-query-prompt)
   (if (and (consp val) (eq (car val) 'file-query))
       (cl-letf (((symbol-function 'y-or-n-p) #'always))
@@ -7,13 +9,13 @@
     (funcall orig val arg)))
 
 (defun adh--rename-isearch-occur-buffer (&rest _)
-  "Rename the *Occur* buffer after `isearch-occur' to include the search string."
+  "Name the `isearch-occur' buffer after the search string."
   (when (get-buffer "*Occur*")
     (with-current-buffer "*Occur*"
       (rename-buffer (format "*s-occur: %s*" isearch-string) t))))
 
 (defun adh--isearch-with-region (forward)
-  "Start isearch in FORWARD direction, pre-filled with the active region if any."
+  "Start isearch in FORWARD direction, seeded with the region."
   (if (use-region-p)
       (let ((search-string (buffer-substring-no-properties (region-beginning) (region-end))))
         (deactivate-mark)
@@ -31,44 +33,21 @@
   (interactive)
   (adh--isearch-with-region nil))
 
-(defun adh-enable-vc ()
-  "Turn the built-in VC backends and `global-diff-hl-mode' on."
-  (interactive)
-  (setq vc-handled-backends '(RCS CVS SVN SCCS SRC Bzr Git Hg))
-  (dolist (buf (buffer-list))
-    (with-current-buffer buf
-      (when (and buffer-file-name
-                 (not (file-remote-p buffer-file-name)))
-        (ignore-errors (vc-refresh-state)))))
-  (when (require 'diff-hl nil t)
-    (global-diff-hl-mode 1))
-  (setq adh--vc-enabled t))
-
-(defun adh-disable-vc ()
-  "Disable all built-in VC backends and `global-diff-hl-mode'."
-  (interactive)
-  (setq adh--vc-enabled nil)
-  (setq vc-handled-backends nil)
-  (when (bound-and-true-p global-diff-hl-mode)
-    (global-diff-hl-mode -1)))
-
-(defun adh-toggle-vc-mode ()
-  "Toggle the built-in VC backends on or off."
-  (interactive)
-  (if adh--vc-enabled
-      (adh-disable-vc)
-    (adh-enable-vc)))
-
-(defun adh-clear-register (reg)
-  "Delete a single register REG, prompting with the register preview."
-  (interactive (list (register-read-with-preview "Clear register: ")))
-  (setq register-alist (assq-delete-all reg register-alist)))
-
-(defun adh-clear-all-registers ()
-  "Empty all registers."
-  (interactive)
-  (setq register-alist nil)
-  (message "All registers cleared"))
+(defun adh--apply-vc (on)
+  "Turn the built-in VC backends and `global-diff-hl-mode' ON or off."
+  (if on
+      (progn
+        (setq vc-handled-backends '(RCS CVS SVN SCCS SRC Bzr Git Hg))
+        (dolist (buf (buffer-list))
+          (with-current-buffer buf
+            (when (and buffer-file-name
+                       (not (file-remote-p buffer-file-name)))
+              (ignore-errors (vc-refresh-state)))))
+        (when (require 'diff-hl nil t)
+          (global-diff-hl-mode 1)))
+    (setq vc-handled-backends nil)
+    (when (bound-and-true-p global-diff-hl-mode)
+      (global-diff-hl-mode -1))))
 
 (defun adh-switch-dired-buffer ()
   "Switch to a Dired buffer."
@@ -87,12 +66,23 @@
   (isearch-case-fold-search t)
   (search-whitespace-regexp ".*?")
   (lazy-count-prefix-format "(%s/%s) ")
-  (lazy-count-suffix-format nil)
   :config
   (advice-add 'isearch-occur :after #'adh--rename-isearch-occur-buffer))
 
+(defun adh--dired-rename-buffer ()
+  "Name a Dired buffer PROJECT/REL/ inside a project, else by its path."
+  (unless (bound-and-true-p dirvish-fd-buffer)
+    (let ((root (adh--get-project-dir)))
+      (rename-buffer
+       (if root
+           (let ((rel (file-relative-name default-directory root)))
+             (concat (file-name-nondirectory (directory-file-name root)) "/"
+                     (unless (equal rel "./") rel)))
+         (abbreviate-file-name default-directory))
+       t))))
+
 (use-package dired
-  :ensure nil
+  :ensure nil :defer t
   :custom
   (dired-recursive-copies 'always)
   (dired-recursive-deletes 'always)
@@ -101,45 +91,24 @@
   (dired-hide-details-hide-symlink-targets nil)
   (dired-listing-switches "-alh --group-directories-first --sort=version")
   :hook
-  (dired-mode . (lambda ()
-                  (let* ((git-root   (locate-dominating-file default-directory ".git"))
-                         (repo-name  (and git-root
-                                          (file-name-nondirectory
-                                           (directory-file-name git-root))))
-                         (relative   (if git-root
-                                         (directory-file-name
-                                          (file-relative-name default-directory git-root))
-                                       (abbreviate-file-name
-                                        (directory-file-name default-directory))))
-                         (core-name  (cond
-                                      ((not git-root) relative)
-                                      ((member relative '("." "./")) repo-name)
-                                      (t (format "%s/%s" repo-name relative))))
-                         (final-name (file-name-as-directory core-name)))
-                    (unless (or (string= (buffer-name) final-name)
-                                (bound-and-true-p dirvish-fd-buffer))
-                      (rename-buffer final-name t)))
-                  (when (fboundp 'zoxide-add)
-                    (zoxide-add))))
+  (dired-mode . adh--dired-rename-buffer)
   (dired-mode . (lambda () (display-line-numbers-mode -1))))
 
 (use-package wdired
-  :ensure nil
+  :ensure nil :defer t
   :custom
-  (wdired-allow-to-change-permissions t)
-  (wdired-create-parent-directories t))
+  (wdired-allow-to-change-permissions t))
 
 (use-package org
   :ensure nil
   :custom
   (org-M-RET-may-split-line '((default . nil)))
   (org-insert-heading-respect-content t)
-  (org-startup-folded 'showeverything)
-  (org-src-fontify-natively t)
   (org-indent-indentation-per-level 4)
   (org-directory (expand-file-name "org-tasks" user-emacs-directory))
-  (org-capture-templates `(("t" "Todo" entry (file ,(expand-file-name "tasks.org" org-directory)) "* TODO %?  :%^g:")))
+  (org-capture-templates `(("t" "Todo" entry (file ,(expand-file-name "tasks.org" org-directory)) "* TODO %?  %^g")))
   (org-agenda-files (list org-directory))
+  (org-agenda-skip-unavailable-files t)
   (org-log-done 'time)
   (org-log-into-drawer t)
   (org-deadline-warning-days 0)
@@ -148,37 +117,55 @@
   :hook
   (org-mode . org-indent-mode))
 
-(use-package bookmark)
-
 (use-package savehist
   :config
   (savehist-mode 1))
 
 (use-package recentf
+  :functions recentf-cleanup
   :custom
   (recentf-exclude '("^/tmp"))
-  (recentf-max-menu-items 10)
   (recentf-max-saved-items 5000)
+  (recentf-auto-cleanup 'never)
   :config
-  (defun recentf-open ()
-    "Open a recently visited file (overrides the built-in menu-style command).
-Already-open files just switch to their buffer.  Marginalia annotates the
-candidates as files because `recentf-open' is in `marginalia-command-categories'."
-    (interactive)
-    (find-file (completing-read "Open: " (mapcar #'abbreviate-file-name recentf-list) nil t)))
-  (recentf-mode 1))
+  (recentf-mode 1)
+  (add-hook 'after-init-hook
+            (lambda ()
+              (run-with-idle-timer 0 nil (lambda () (let ((inhibit-message t)) (recentf-cleanup)))))))
 
-(use-package vc
+(add-to-list 'minor-mode-alist '(adh-use-vc " vc"))
+
+(use-package transient :defer t)
+
+(use-package repeat
   :ensure nil
-  :init
-  (defconst adh--vc-mode-line-name " vc")
-  :custom
-  (auto-revert-check-vc-info nil)
   :config
-  (defvar adh--vc-enabled nil)
-  (add-to-list 'minor-mode-alist '(adh--vc-enabled adh--vc-mode-line-name)))
+  (repeat-mode 1))
 
-(use-package transient)
+(use-package glasses
+  :ensure nil :defer t
+  :custom
+  (glasses-separate-parentheses-p nil))
+
+(define-globalized-minor-mode adh-global-glasses-mode glasses-mode glasses-mode
+  :predicate '(prog-mode) :group 'adhoc)
+
+(defun adh--apply-subwords (on)
+  "Turn subword motion and display ON or off in all buffers."
+  (cond (on (global-subword-mode 1)
+            (adh-global-glasses-mode 1))
+        (t (when (bound-and-true-p global-subword-mode)
+             (global-subword-mode -1))
+           (when adh-global-glasses-mode
+             (adh-global-glasses-mode -1)))))
+
+(defun adh--apply-which-key (on)
+  "Turn `which-key-mode' ON or off; inside a transient menu, once it exits."
+  (remove-hook 'transient-exit-hook 'transient--resume-which-key-mode)
+  (cond ((and on (bound-and-true-p transient--prefix))
+         (add-hook 'transient-exit-hook 'transient--resume-which-key-mode))
+        (on (which-key-mode 1))
+        ((bound-and-true-p which-key-mode) (which-key-mode -1))))
 
 (use-package ediff
   :ensure nil :defer t
@@ -187,9 +174,23 @@ candidates as files because `recentf-open' is in `marginalia-command-categories'
   (ediff-window-setup-function #'ediff-setup-windows-plain)
   :hook
   (ediff-quit . (lambda () (global-whitespace-mode 1)))
-  (ediff-startup . (lambda () (global-whitespace-mode -1) (meow-insert-mode 1)))
-  (ediff-keymap-setup . (lambda ()
-                          (keymap-set ediff-mode-map "," #'ediff-next-difference)
-                          (keymap-set ediff-mode-map "." #'ediff-previous-difference))))
+  (ediff-startup . (lambda () (global-whitespace-mode -1) (when (fboundp 'meow-insert-mode) (meow-insert-mode 1)))))
+
+(use-package diff-mode
+  :ensure nil :defer t
+  :custom
+  (diff-font-lock-prettify t)
+  :hook
+  (diff-mode . (lambda () (setq-local show-trailing-whitespace t))))
+
+(use-package which-key
+  :ensure nil :defer t
+  :custom
+  (which-key-popup-type 'minibuffer)
+  (which-key-lighter nil))
+
+(adh--apply-vc adh-use-vc)
+(adh--apply-subwords adh-subwords)
+(adh--apply-which-key adh-use-which-key)
 
 (provide 'adh-core-packages)

@@ -12,13 +12,15 @@
 (adh-require! 'adh-eglot)
 (adh-require! 'adh-ext-packages)
 (adh-require! 'adh-completion)
-(adh-require! 'adh-setup)
+(adh-require! 'adh-settings)
 (adh-require! 'adh-minibuffer)
 (adh-require! 'adh-prog-modes)
 (adh-require! 'adh-consult)
 (adh-require! 'adh-magit)
 (adh-require! 'adh-modeline)
-(when adh-use-custom-keybinds
+(when (and adh-use-custom-keybinds
+           (adh-keybinds-need! '(adh-core-packages adh-project adh-eglot adh-ext-packages
+                                 adh-completion adh-settings adh-consult adh-magit)))
   (adh-require! 'adh-meow)
   (adh-require! 'adh-keybinds))
 (adh-require! 'adh-server)

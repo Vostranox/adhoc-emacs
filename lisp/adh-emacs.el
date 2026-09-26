@@ -1,19 +1,31 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(require 'adh-vars)
+(require 'adh-functions)
+
 (defun adh--create-parent-dir-on-the-fly ()
-  "Create the visited file's parent directory if it is missing.
-Hooked into `find-file-not-found-functions' so new files in new folders just work."
+  "Create a missing parent directory for the visited file."
   (let ((dir (file-name-directory buffer-file-name)))
     (when (and dir (not (file-exists-p dir)))
       (make-directory dir t)))
   nil)
 
-(use-package gruber-material-dark
-  :vc (:url "https://github.com/Vostranox/gruber-material-dark")
-  :demand t
-  :config
-  (unless (custom-theme-enabled-p 'gruber-material-dark-intense)
-    (load-theme 'gruber-material-dark-intense :no-confirm)))
+(define-advice forward-sexp (:around (orig &rest args) adh-syntax-only)
+  (let ((forward-sexp-function nil))
+    (apply orig args)))
+
+(define-advice read-buffer-to-switch (:filter-args (_args) adh-short-prompt)
+  (list "Switch to: "))
+
+(define-advice list-buffers--refresh (:after (&rest _) adh-minimal)
+  (setq tabulated-list-format (seq-remove-at-position tabulated-list-format 4)
+        tabulated-list-entries
+        (mapcar (lambda (e) (list (car e) (seq-remove-at-position (cadr e) 4)))
+                tabulated-list-entries)))
+
+(define-advice tabulated-list-init-header (:after () adh-buffer-menu)
+  (when (derived-mode-p 'Buffer-menu-mode)
+    (setq header-line-format nil)))
 
 (use-package emacs
   :ensure nil
@@ -33,25 +45,23 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
 
   :custom
   (auto-revert-verbose nil)
-  (auto-revert-remote-files nil)
   (revert-without-query '(".*"))
 
   (c-basic-offset 4)
   (c-default-style "bsd")
-  (c-ts-mode-indent-offset 4)
+  (c-ts-indent-offset 4)
   (c-ts-mode-indent-style 'bsd)
-  (go-ts-mode-indent-offset 4)
+  (go-ts-indent-offset 4)
 
   (compile-command "")
   (compilation-scroll-output t)
   (compilation-environment '("NO_COLOR=1"))
+  (next-error-find-buffer-function #'next-error-buffer-unnavigated-current)
 
   (completion-ignored-extensions (delete ".git/" completion-ignored-extensions))
 
   (column-number-mode t)
   (display-line-numbers-type 'relative)
-  (icon-title-format frame-title-format)
-  (visible-bell nil)
   (use-short-answers t)
 
   (duplicate-line-final-position -1)
@@ -72,20 +82,17 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
   (save-interprogram-paste-before-kill t)
 
   (whitespace-global-modes '(not magit-mode dired-mode wdired-mode diff-mode))
-  (whitespace-line-column 10000)
   (whitespace-style
-   '(face tabs spaces trailing lines-tail space-before-tab indentation
-          newline empty space-after-tab space-mark tab-mark))
+   '(face tabs spaces trailing space-before-tab indentation
+          empty space-after-tab space-mark tab-mark))
 
   (completion-show-help nil)
   (completions-header-format "")
-  (completions-max-height adh-list-max-height)
   (completions-format 'one-column)
   (completions-detailed t)
   (completion-eager-display nil)
   (completion-eager-update t)
 
-  (imenu-flatten nil)
   (imenu-max-items 100)
   (imenu-max-item-length 1000)
 
@@ -95,75 +102,42 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
   (history-length 5000)
 
   (tab-bar-show nil)
-  (tab-bar-new-tab-choice "*scratch*")
-  (tab-bar-new-button-show nil)
-  (tab-bar-close-button-show nil)
+  (tab-bar-new-tab-choice #'get-scratch-buffer-create)
 
-  (initial-buffer-choice (lambda () (get-buffer "*scratch*")))
   (initial-scratch-message ";;\n\n")
 
   (confirm-kill-emacs 'y-or-n-p)
-
-  (adh-tmux-cd-session "dev:eshell")
 
   (Buffer-menu-name-width 28)
   (Buffer-menu-mode-width 14)
   (window-divider-default-right-width 1)
   :config
-  (setq-default case-fold-search t
-                indent-tabs-mode nil
+  (setq-default indent-tabs-mode nil
                 tab-width 4)
   (set-language-environment "UTF-8")
   (prefer-coding-system 'utf-8-unix)
-  (set-default-coding-systems 'utf-8-unix)
-  (setq-default buffer-file-coding-system 'utf-8-unix)
   (unless (display-graphic-p)
     (set-terminal-coding-system 'utf-8-unix)
     (set-keyboard-coding-system 'utf-8-unix))
-  (when (eq system-type 'windows-nt)
-    (set-clipboard-coding-system 'utf-16-le)
-    (set-selection-coding-system 'utf-16-le)
-    (setq default-process-coding-system '(utf-8-unix . utf-8-unix)))
 
-  (add-to-list 'default-frame-alist '(fullscreen . maximized))
-  (when (eq system-type 'darwin)
-    (setq ns-use-proxy-icon nil)
-    (add-to-list 'default-frame-alist '(ns-appearance . dark))
-    (add-to-list 'default-frame-alist '(ns-transparent-titlebar . t)))
-  (adh-set-window-decoration adh-window-decoration)
-  (adh-set-frame-opacity adh-frame-opacity)
+  (adh--apply-window-decoration adh-window-decoration)
+  (adh--apply-frame-opacity adh-frame-opacity)
+  (adh--apply-list-max-height adh-list-max-height)
   (setq frame-title-format nil)
 
-  (adh-set-font adh-mono-spaced-font adh-mono-spaced-font-size)
+  (adh--apply-font-settings)
 
   (adh-add-to-path "~/bin")
 
-  (setq display-buffer-alist
-        '(("\\*Completions\\*"
-           (display-buffer-reuse-window display-buffer-in-side-window)
-           (side . bottom)
-           (window-height . completions--fit-window-to-buffer)
-           (window-parameters . ((no-other-window . t))))))
-
-  (setq-default truncate-lines nil)
+  (add-to-list 'display-buffer-alist
+               '("\\*Completions\\*"
+                 (display-buffer-reuse-window display-buffer-in-side-window)
+                 (side . bottom)
+                 (window-height . completions--fit-window-to-buffer)
+                 (window-parameters . ((no-other-window . t)))))
 
   (setq switch-to-prev-buffer-skip
         (lambda (_window buf _bury-or-kill) (not (adh--buffer-listable-p buf))))
-
-  (advice-add 'read-buffer-to-switch :filter-args #'(lambda (args) (list "Switch to: ")))
-
-  (define-advice list-buffers--refresh (:after (&rest _) adh-minimal)
-    (setq tabulated-list-format
-          (vconcat (seq-take tabulated-list-format 4)
-                   (seq-drop tabulated-list-format 5)))
-    (setq tabulated-list-entries
-          (mapcar (lambda (entry)
-                    (let ((v (cadr entry)))
-                      (list (car entry)
-                            (vconcat (seq-take v 4) (seq-drop v 5)))))
-                  tabulated-list-entries))
-    (tabulated-list-init-header)
-    (setq header-line-format nil))
 
   (delete-selection-mode 1)
   (global-display-line-numbers-mode 1)
@@ -174,14 +148,11 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
   (winner-mode 1)
   :hook
   (emacs-startup . (lambda () (tab-bar-rename-tab "dev") (message "[adh] Activated %d packages in %s" (length package-activated-list) (emacs-init-time))))
-  ;; Always use the default sexp motion, ignoring any mode-installed
-  ;; `forward-sexp-function' (e.g. tree-sitter's).
-  (after-init . (lambda () (advice-add #'forward-sexp :around (lambda (orig &rest args) (let ((forward-sexp-function nil)) (apply orig args))))))
   (find-file-not-found-functions . adh--create-parent-dir-on-the-fly)
   (text-mode . visual-line-mode)
-  (diff-mode . (lambda () (setq-local show-trailing-whitespace t)))
   (completion-list-mode . (lambda () (display-line-numbers-mode -1)))
   (compilation-mode . (lambda () (setq-local scroll-conservatively 101)))
+  (compilation-start . (lambda (_) (window--adjust-process-windows)))
   (completion-setup . adh--completions-preselect-first)
   (before-save . delete-trailing-whitespace))
 

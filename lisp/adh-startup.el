@@ -9,7 +9,7 @@
 (defun adh--log-init-error (type target err)
   "Log an init failure."
   (let ((msg (format "[adh][error] %s %S: %s" type target (error-message-string err))))
-    (message msg)
+    (message "%s" msg)
     (display-warning 'adhoc msg :error)
     (setq adh--init-errors-p t)
     nil))
@@ -17,7 +17,8 @@
 (add-hook 'emacs-startup-hook
           (lambda ()
             (when (and adh--init-errors-p (get-buffer "*Messages*"))
-              (select-window (window-main-window))
+              (let ((main (window-main-window)))
+                (select-window (if (window-live-p main) main (frame-first-window))))
               (dolist (win (window-list))
                 (set-window-dedicated-p win nil)
                 (set-window-parameter win 'no-delete-other-windows nil)
@@ -26,29 +27,34 @@
               (delete-other-windows)
               (message "[adh][error] Initialization failed with errors. Review *Messages* and *Warnings*."))))
 
-(defmacro adh-require! (feature)
+(defun adh-require! (feature)
   "Require FEATURE, logging success; catch and record any load error."
-  `(let ((feat ,feature))
-     (condition-case err
-         (progn (require feat)
-                (message "[adh][ok] Required %s" feat)
-                t)
-       (error
-        (adh--log-init-error
-         (format "Error loading feature (file: %s)"
-                 (or (locate-library (symbol-name feat))
-                     "Path not found in load-path"))
-         feat err)))))
+  (condition-case err
+      (progn (require feature)
+             (message "[adh][ok] Required %s" feature)
+             t)
+    (error
+     (adh--log-init-error
+      (format "Error loading feature (file: %s)"
+              (or (locate-library (symbol-name feature))
+                  "Path not found in load-path"))
+      feature err))))
 
-(defmacro adh-load! (filename)
-  "Load FILENAME from the user dir; a missing file is fine, errors are logged.
-Returns t when the file was loaded, nil if absent or on error."
-  `(let ((file ,filename))
-     (condition-case err
-         (when (load (locate-user-emacs-file file) t)
-           (message "[adh][ok] Loaded %s" file)
-           t)
-       (error (adh--log-init-error "Failed to load file" file err)))))
+(defun adh-load! (file)
+  "Load FILE from the user dir, logging errors; return t if loaded."
+  (condition-case err
+      (when (load (locate-user-emacs-file file) t)
+        (message "[adh][ok] Loaded %s" file)
+        t)
+    (error (adh--log-init-error "Failed to load file" file err))))
+
+(defun adh-keybinds-need! (features)
+  "Return non-nil if FEATURES are loaded; otherwise report the keybindings as off."
+  (let ((missing (seq-remove #'featurep features)))
+    (when missing
+      (message "[adh] Custom keybindings off; they need %s"
+               (mapconcat #'symbol-name missing ", ")))
+    (null missing)))
 
 (setq native-comp-async-env-modifier-form
       '(progn
@@ -56,48 +62,59 @@ Returns t when the file was loaded, nil if absent or on error."
          (require 'no-littering nil t)))
 
 (defun adh--config-stale-p ()
-  "Return non-nil when some file under lisp/ has no .elc or is newer than it."
-  (catch 'stale
-    (dolist (el (directory-files (locate-user-emacs-file "lisp/") t "\\`adh-.*\\.el\\'"))
-      (when (file-newer-than-file-p el (concat el "c"))
-        (throw 'stale t)))))
+  "Return non-nil if a lisp/ .elc is missing or older than its .el, elpa/ or Emacs."
+  (let ((emacs (expand-file-name invocation-name invocation-directory)))
+    (catch 'stale
+      (dolist (el (directory-files (locate-user-emacs-file "lisp/") t "\\`adh-.*\\.el\\'"))
+        (let ((elc (concat el "c")))
+          (when (or (file-newer-than-file-p el elc)
+                    (file-newer-than-file-p package-user-dir elc)
+                    (file-newer-than-file-p emacs elc))
+            (throw 'stale t)))))))
+
+(defun adh--delete-config-elc ()
+  "Delete lisp/*.elc, so lisp/ loads from source."
+  (dolist (elc (directory-files (locate-user-emacs-file "lisp/") t "\\.elc\\'"))
+    (delete-file elc)))
 
 (defun adh-compile-config ()
-  "Byte-compile every file under lisp/ in a separate Emacs and wait for it.
-All files are recompiled together, so none keeps a stale expansion of
-another's macro.  Loading the new .elc files queues their native compilation.
-Return non-nil on success."
+  "Byte-compile lisp/ in a background Emacs, for the next session."
   (interactive)
-  (let* ((dir (locate-user-emacs-file "lisp/"))
-         (buf (get-buffer-create " *adh-compile-config*"))
-         (form `(progn
-                  (setq package-user-dir ,package-user-dir)
-                  (when (fboundp 'startup-redirect-eln-cache)
-                    (startup-redirect-eln-cache ,(car native-comp-eln-load-path)))
-                  (package-activate-all)
-                  (require 'no-littering nil t)
-                  (add-to-list 'load-path ,dir)
-                  (let ((failed 0))
-                    (dolist (el (directory-files ,dir t "\\`adh-.*\\.el\\'"))
-                      (unless (byte-compile-file el)
-                        (setq failed (1+ failed))))
-                    (setq kill-emacs-hook nil)
-                    (kill-emacs failed)))))
-    (message "[adh] Compiling lisp/...")
-    (with-current-buffer buf (erase-buffer))
-    (let ((proc (make-process
-                 :name "adh-compile-config"
-                 :buffer buf
-                 :noquery t
-                 :command (list (expand-file-name invocation-name invocation-directory)
-                                "-Q" "--batch" "--eval" (prin1-to-string form)))))
-      (while (process-live-p proc)
-        (if (input-pending-p)
-            (accept-process-output proc 0.05)
-          (sit-for 0.05)))
-      (if (eq 0 (process-exit-status proc))
-          (progn (message "[adh] Compiling lisp/...done") t)
-        (adh--log-init-error "Failed to compile" dir
-                             (list 'error (format "see buffer %S" (buffer-name buf))))))))
+  (adh--delete-config-elc)
+  (let ((dir (locate-user-emacs-file "lisp/")))
+    (make-process
+     :name "adh-compile-config"
+     :buffer (with-current-buffer (get-buffer-create " *adh-compile-config*")
+               (erase-buffer)
+               (current-buffer))
+     :noquery t
+     :command `(,(expand-file-name invocation-name invocation-directory)
+                "-Q" "--batch" "-L" ,dir
+                "--eval" ,(format "(setq package-user-dir %S)" package-user-dir)
+                ,@(when (native-comp-available-p)
+                    (list "--eval" (format "(startup-redirect-eln-cache %S)"
+                                           (car native-comp-eln-load-path))))
+                "-f" "package-activate-all"
+                "--eval" ,(prin1-to-string native-comp-async-env-modifier-form)
+                "--eval" ,(prin1-to-string
+                           `(with-demoted-errors "[adh][error] Package quickstart: %S"
+                              (require 'package)
+                              (setq package-quickstart-file ,package-quickstart-file)
+                              (make-directory (file-name-directory package-quickstart-file) t)
+                              (let ((warning-inhibit-types '((bytecomp))))
+                                (package-quickstart-refresh))))
+                "-f" "batch-byte-compile"
+                ,@(directory-files dir t "\\`adh-.*\\.el\\'"))
+     :sentinel (lambda (proc _)
+                 (unless (process-live-p proc)
+                   (if (zerop (process-exit-status proc))
+                       (message "[adh] Compiled lisp/")
+                     (display-warning 'adhoc "[adh][warning] Compiling lisp/ failed; see buffer \" *adh-compile-config*\"")))))))
+
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (when (and (not adh--init-errors-p)
+                       (or (adh--config-stale-p) (not (file-exists-p package-quickstart-file))))
+              (adh-compile-config))))
 
 (provide 'adh-startup)

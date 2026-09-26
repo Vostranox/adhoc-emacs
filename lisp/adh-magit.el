@@ -1,10 +1,14 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(require 'adh-functions)
+
 (eval-when-compile
   (when (bound-and-true-p byte-compile-current-file)
     (require 'magit)))
 
-;; A trimmed magit-status that shows only the staging-relevant sections.
+(defvar adh--magit-submodule-foreach-history nil
+  "Minibuffer history of `adh-magit-submodule-foreach'.")
+
 (define-derived-mode magit-staging-mode magit-status-mode "magit-staging"
   "Like `magit-status-mode' but limited to staged/unstaged changes."
   :group 'magit-status)
@@ -16,28 +20,23 @@
     (magit-insert-unstaged-changes)
     (magit-insert-staged-changes)))
 
-(defun adh--magit-show-commit-current-file (orig-fun &rest args)
-  "Advice for `magit-show-commit': when blaming, limit the diff to the current file."
-  (if (and (null (nth 2 args))
-           (or (bound-and-true-p magit-blame-mode)
-               (bound-and-true-p magit-blame-read-only-mode))
-           (buffer-file-name))
-      (let* ((rel (magit-file-relative-name (buffer-file-name)))
-             (rev (nth 0 args))
-             (cmdargs (nth 1 args))
-             (module (nth 3 args)))
-        (funcall orig-fun rev cmdargs (list rel) module))
-    (apply orig-fun args)))
+(defvar adh--magit-show-full-commit nil
+  "Non-nil while `adh-magit-show-commit-original' runs.")
+
+(defun adh--magit-show-commit-current-file (fn rev &optional args files module)
+  "Advice for `magit-show-commit': limit the diff to the blamed file."
+  (when-let* ((chunk (and (bound-and-true-p magit-blame-mode) (magit-current-blame-chunk))))
+    (setq files (unless adh--magit-show-full-commit (list (oref chunk orig-file)))))
+  (funcall fn rev args files module))
 
 (defun adh-magit-staging ()
   "Open the trimmed staging-only magit buffer."
   (interactive)
   (require 'magit)
-  (magit-setup-buffer #'magit-staging-mode #'magit-staging-refresh-buffer))
+  (magit-setup-buffer #'magit-staging-mode))
 
 (defun adh-magit-staging-quick ()
-  "Show an existing staging buffer if one is hidden, else open a fresh one.
-With a prefix arg, always open a fresh one."
+  "Show a hidden staging buffer or open one; a prefix arg forces a new one."
   (interactive)
   (require 'magit)
   (if-let* ((buffer
@@ -48,33 +47,33 @@ With a prefix arg, always open a fresh one."
     (adh-magit-staging)))
 
 (defun adh-magit-show-commit-original ()
-  "Show the full commit at point, bypassing the blame file-narrowing advice."
+  "Show the full commit at point, bypassing the blame narrowing."
   (interactive)
-  (let ((had (advice-member-p #'adh--magit-show-commit-current-file
-                              'magit-show-commit)))
-    (unwind-protect
-        (progn
-          (when had
-            (advice-remove 'magit-show-commit #'adh--magit-show-commit-current-file))
-          (call-interactively #'magit-show-commit))
-      (when had
-        (advice-add 'magit-show-commit :around #'adh--magit-show-commit-current-file)))))
+  (let ((adh--magit-show-full-commit t))
+    (call-interactively #'magit-show-commit)))
 
 (defun adh-magit-restore-current ()
-  "Discard uncommitted changes in the current file (git restore), then revert it."
+  "Discard unstaged changes to this file or directory (git restore)."
   (interactive)
   (require 'magit)
-  (let ((path (adh-copy-full-path)))
-    (when (y-or-n-p (format "Restore changes in %s? " path))
+  (let ((path (expand-file-name (or (adh--buffer-file-name) default-directory))))
+    (when (y-or-n-p (format "Restore %s? "
+                            (file-relative-name path (magit-toplevel (file-name-directory path)))))
       (magit-call-git "restore" path)
-      (when (get-file-buffer path)
-        (with-current-buffer (get-file-buffer path)
+      (when-let* ((buf (get-file-buffer path)))
+        (with-current-buffer buf
           (revert-buffer :ignore-auto :noconfirm))))))
 
 (defun adh-switch-magit-buffer ()
   "Switch to a Magit buffer."
   (interactive)
   (adh-switch-buffer-of-mode 'magit-status-mode "Magit: "))
+
+(defun adh-magit-status-dwim ()
+  "Show this repo's status without refreshing, else prompt for a repo."
+  (interactive)
+  (require 'magit)
+  (call-interactively (if (magit-toplevel) #'magit-status-quick #'magit-status)))
 
 (defun adh-magit-visit-file-dwim (&optional other-window)
   "Visit the worktree file from staged file headings, otherwise as usual.
@@ -85,21 +84,17 @@ With a prefix argument OTHER-WINDOW, display the buffer in another window."
     (magit-diff-visit-file other-window)))
 
 (defun adh-magit-visit-thing-other-window ()
-  "Visit the thing at point in another window.
-Dispatches to whatever RET would visit for the section at point
-\(file, commit, stash, branch, ...) but displays it in another window."
+  "Visit whatever RET would visit at point, in another window."
   (interactive)
   (let ((cmd (key-binding (kbd "RET"))))
-    (cond ((eq cmd #'adh-magit-visit-file-dwim)
-           (adh-magit-visit-file-dwim t))
-          ((eq cmd #'magit-diff-visit-file)
-           (call-interactively #'magit-diff-visit-file-other-window))
+    (cond ((memq cmd '(adh-magit-visit-file-dwim magit-diff-visit-file))
+           (funcall cmd t))
           (t
            (let ((display-buffer-overriding-action '(nil (inhibit-same-window . t))))
              (call-interactively (or cmd #'magit-visit-thing)))))))
 
 (defun adh-magit-preview-thing ()
-  "Visit the thing at point in another window but keep point in this window."
+  "Visit the thing at point in another window, keeping point here."
   (interactive)
   (save-selected-window
     (adh-magit-visit-thing-other-window)))
@@ -107,10 +102,7 @@ Dispatches to whatever RET would visit for the section at point
 (defun adh-magit-blame-copy-short-hash ()
   "Copy the 7-character short hash of the blamed commit to the kill ring."
   (interactive)
-  (magit-blame-copy-hash)
-  (when-let* ((last (current-kill 0)))
-    (kill-new (substring last 0 7))
-    (message "%s" (substring last 0 7))))
+  (kill-new (message "%s" (substring (oref (magit-current-blame-chunk) orig-rev) 0 7))))
 
 (defun adh-toggle-magit-blame ()
   "Toggle `magit-blame' for the current file."
@@ -128,28 +120,32 @@ Dispatches to whatever RET would visit for the section at point
   "Show the line-history (git log -L) of the region, or the current line."
   (interactive)
   (require 'magit)
-  (let* ((file (or (magit-file-relative-name)
-                   (user-error "Buffer is not visiting a file")))
-         (commit (or magit-buffer-revision
-                     (magit-get-current-branch)
-                     "HEAD"))
-         (beg (if (use-region-p) (line-number-at-pos (region-beginning)) (line-number-at-pos)))
-         (end (if (use-region-p) (line-number-at-pos (region-end)) (line-number-at-pos)))
-         (l-arg (format "-L%s,%s:%s" beg end file))
-         (raw-args (magit-log-arguments))
-         (clean-args (cl-remove-if (lambda (arg)
-                                     (or (not (stringp arg))
-                                         (string-prefix-p "-L" arg)))
-                                   (flatten-tree raw-args))))
-    (magit-log-setup-buffer
-     (list commit)
-     (cons l-arg clean-args)
-     nil
-     nil)))
+  (let ((line (line-number-at-pos nil t))
+        (magit-log-buffer-file-locked nil))
+    (apply #'magit-log-buffer-file nil
+           (or (magit-file-region-line-numbers) (list line line)))))
+
+(defun adh-magit-submodule-update-all ()
+  "Run git submodule update --init --recursive with the menu's arguments."
+  (interactive)
+  (require 'magit)
+  (magit-with-toplevel
+    (magit-run-git-async "submodule" "update" "--init" "--recursive"
+                         (magit-submodule-arguments "--force" "--remote" "--no-fetch"
+                                                    "--checkout" "--rebase" "--merge"))))
+
+(defun adh-magit-submodule-foreach ()
+  "Read the rest of a git submodule foreach command and run it at the top level."
+  (interactive)
+  (require 'magit)
+  (magit-with-toplevel
+    (let ((prefix (concat "git submodule foreach "
+                          (and (magit-submodule-arguments "--recursive") "--recursive "))))
+      (magit-shell-command-topdir
+       (concat prefix (read-shell-command prefix nil 'adh--magit-submodule-foreach-history))))))
 
 (use-package magit
   :ensure t :defer 10
-  :commands (magit magit-status magit-status-quick)
   :init
   (setq magit-auto-revert-mode nil)
   :custom
@@ -157,7 +153,7 @@ Dispatches to whatever RET would visit for the section at point
   (magit-commit-show-diff nil)
   (magit-bury-buffer-function #'magit-restore-window-configuration)
   (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1)
-  (magit-diff-refine-hunk nil)
+  (magit-revision-filter-files-on-follow t)
   (magit-log-margin '(t "%Y-%m-%d %H:%M" magit-log-margin-width t 18))
   (magit-section-initial-visibility-alist
    '((staged . hide) (unstaged . hide) (untracked . hide) (stashes . hide) (unpushed . hide) (unpulled . hide)))
@@ -174,5 +170,21 @@ Dispatches to whatever RET would visit for the section at point
                                                     what
                                                   (format "%s: %s" kind what))
                                                 t)))))))
+
+(with-eval-after-load 'magit-files
+  (transient-replace-suffix 'magit-file-dispatch 'magit-log-trace-definition
+    '("t" "Trace" adh-magit-log-trace-region-or-line))
+  (transient-replace-suffix 'magit-file-dispatch 'magit-log-buffer-file
+    '("l" "Log" adh-magit-log-buffer-file-follow :if-not-derived dired-mode))
+  (transient-replace-suffix 'magit-file-dispatch 'magit-blame-addition
+    '("b" "Blame" adh-toggle-magit-blame))
+  (transient-append-suffix 'magit-file-dispatch ", c"
+    '(", R" "Restore" adh-magit-restore-current)))
+
+(with-eval-after-load 'magit-submodule
+  (transient-append-suffix 'magit-submodule 'magit-fetch-modules
+    '("U" "Update all modules" adh-magit-submodule-update-all))
+  (transient-append-suffix 'magit-submodule 'adh-magit-submodule-update-all
+    '("!" "Run in each module" adh-magit-submodule-foreach)))
 
 (provide 'adh-magit)

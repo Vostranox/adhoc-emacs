@@ -4,15 +4,20 @@
 
 (setq adh-tmux-cd-session "session:window.pane")
 
-(adh-set-eglot-stay-out-of '(eldoc flymake yas))
-(adh-set-completion-ui 'company)
-(adh-set-use-dirvish t)
-
-(adh-set-frame-opacity 100)
-(adh-set-window-decoration t)
-(adh-set-list-max-height 20)
-
-(adh-set-font adh-mono-spaced-font 110)
+(setopt adh-completion-style 'minimal
+        adh-completion-ui 'popup
+        adh-completion-keys 'tab-only
+        adh-use-lsp nil
+        adh-lsp-diagnostics nil
+        adh-lsp-format-on-save nil
+        adh-use-vc nil
+        adh-subwords nil
+        adh-use-which-key nil
+        adh-use-dirvish t
+        adh-frame-opacity 100
+        adh-window-decoration t
+        adh-list-max-height 20
+        adh-mono-spaced-font-size 110)
 
 (when (eq system-type 'windows-nt)
   (adh-add-to-path "C:/Program Files/Git/bin")
@@ -25,6 +30,6 @@
   (adh-add-to-path "/opt/homebrew/bin/")
   (setq insert-directory-program "gls"))
 
-(define-derived-mode adh-glsl-mode shader-mode "Glsl")
+(define-derived-mode adh-glsl-mode slang-ts-mode "Glsl")
 (adh-set-file-extension-mode "glsl" 'adh-glsl-mode)
 (adh-register-lsp-server 'adh-glsl-mode "glsl_analyzer")

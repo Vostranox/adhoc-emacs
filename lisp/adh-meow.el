@@ -17,15 +17,24 @@
   "Enter insert state, first deleting the region or the character at point."
   (interactive)
   (if (use-region-p)
-      (kill-region (region-beginning) (region-end))
+      (kill-region (region-beginning) (region-end) 'region)
     (unless (eobp) (delete-char 1)))
   (meow-insert))
+
+(defun adh--meow-minibuffer-update-cursor ()
+  "Match the minibuffer cursor shape to the current meow state."
+  (setq cursor-type (if (or (meow-normal-mode-p) (meow-motion-mode-p)) 'box 'bar)))
+
+(defun adh--meow-minibuffer-setup ()
+  "Enable modal editing in the minibuffer, starting in insert state."
+  (meow-insert-mode 1)
+  (setq-local cursor-type 'bar)
+  (add-hook 'post-command-hook #'adh--meow-minibuffer-update-cursor nil t)
+  (redisplay))
 
 (use-package meow
   :ensure t
   :custom
-  (meow-expand-hint-remove-delay 0)
-  (meow-keypad-describe-keymap-function nil)
   (meow-mode-state-list '((conf-mode . normal)
                           (fundamental-mode . normal)
                           (help-mode . normal)
@@ -33,8 +42,7 @@
                           (text-mode . normal)))
   :config
   (meow-global-mode 1)
-  (adh--rename-mode 'meow-normal-mode "")
-  (adh--rename-mode 'meow-insert-mode "")
-  (adh--rename-mode 'meow-motion-mode ""))
+  (add-hook 'minibuffer-setup-hook #'adh--meow-minibuffer-setup)
+  (setq meow-update-cursor-functions-alist (assq-delete-all 'minibufferp meow-update-cursor-functions-alist)))
 
 (provide 'adh-meow)

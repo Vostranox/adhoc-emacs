@@ -1,9 +1,8 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-(require 'package)
-(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
+(with-eval-after-load 'package
+  (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t))
 (require 'use-package)
-(setq use-package-verbose nil)
 
 (defun adh--with-vc-git (fn &rest args)
   "Call FN with ARGS with the Git VC backend enabled."
@@ -12,8 +11,8 @@
                                (cons 'Git vc-handled-backends))))
     (apply fn args)))
 
-(dolist (fn '(package-vc-install package-vc-install-from-checkout
-              package-vc-upgrade package-vc-rebuild))
+(dolist (fn '(package-vc-install package-vc-checkout
+              package-vc-upgrade package-vc--unpack-1))
   (advice-add fn :around #'adh--with-vc-git))
 (when (native-comp-available-p)
   (setq package-native-compile t)

@@ -1,30 +1,80 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(require 'adh-vars)
+
+(defvar vertico-count)
+
 (defvar ls-lisp-use-insert-directory-program)
 
-(defvar adh--font-hook nil
-  "Frame hook installed by `adh-set-font' to apply the font to new frames.")
 (defconst adh--tmux-command (if (eq system-type 'windows-nt) "wsl tmux" "tmux")
   "Shell command used to talk to tmux (via WSL on Windows).")
+(defconst adh--fd-program (locate-user-emacs-file (concat "opt/fd/bin/fd" (when (eq system-type 'windows-nt) ".exe")))
+  "The fd fork that install.sh builds.")
 (defconst adh--minibuffer-pivot-delay 0.000001
-  "Idle seconds before `adh--minibuffer-pivot' reopens the minibuffer.")
+  "Idle seconds before `adh--minibuffer-pivot-call' reopens the minibuffer.")
+(defvar adh--minibuffer-pivot-depth nil
+  "Minibuffer depth of the prompt a pivot opened, while it is active.")
+(defvar-local adh--occur-edit-changes nil
+  "Change group of the edits made since `occur-edit-mode' began.")
+(defvar-local adh--occur-edit-ticks nil
+  "Modification ticks of the Occur sources when `occur-edit-mode' began.")
+(defvar-keymap adh-override-map
+  :doc "Keys above every major and minor mode map, see `adh-override-mode'.")
+
+(defmacro => (&rest body)
+  "Wrap BODY in an anonymous interactive command, for inline keybindings."
+  `(lambda () (interactive) ,@body))
+
+(defmacro adh-defkeymap (name &rest body)
+  "Define keymap NAME with bindings, as in `define-keymap', under a parent.
+BODY starts with the keywords :map PARENT and :prefix KEY, then the bindings.
+Re-evaluating the form updates NAME in place."
+  (declare (indent 1))
+  (let (parent key)
+    (while (keywordp (car body))
+      (pcase (pop body)
+        (:map (setq parent (pop body)))
+        (:prefix (setq key (pop body)))
+        (kw (error "adh-defkeymap: unknown keyword %S" kw))))
+    (unless (and parent key)
+      (error "adh-defkeymap: %S needs :map and :prefix" name))
+    `(progn
+       (defvar-keymap ,name)
+       (define-keymap :keymap ,name ,@body)
+       (keymap-set ,parent ,key ,name))))
+
+(define-minor-mode adh-override-mode
+  "Keep `adh-override-map' above every major and minor mode map."
+  :global t :init-value t :group 'adhoc)
+
+(add-to-list 'emulation-mode-map-alists `((adh-override-mode . ,adh-override-map)))
+(add-hook 'minibuffer-setup-hook (lambda () (setq-local adh-override-mode nil)))
+
+(defun adh--minibuffer-pivot-call (fn)
+  "Abort the minibuffer, then call FN once Emacs is idle.
+In a prompt that a pivot opened, hand FN back to that pivot instead."
+  (if (eql adh--minibuffer-pivot-depth (minibuffer-depth))
+      (throw 'adh--minibuffer-pivot fn)
+    (run-with-idle-timer adh--minibuffer-pivot-delay nil
+     (lambda ()
+       (with-local-quit
+         (while fn
+           (setq fn (catch 'adh--minibuffer-pivot
+                      (let ((adh--minibuffer-pivot-depth (1+ (minibuffer-depth))))
+                        (funcall fn))
+                      nil))))))
+    (abort-recursive-edit)))
 
 (defun adh--minibuffer-pivot (command)
-  "Abort the current minibuffer and reopen it under COMMAND, keeping the input."
+  "Abort the minibuffer and reopen it under COMMAND with the same input."
   (let ((input (minibuffer-contents)))
-    (run-with-idle-timer adh--minibuffer-pivot-delay nil
+    (adh--minibuffer-pivot-call
      (lambda ()
        (minibuffer-with-setup-hook
            (lambda ()
              (setq this-command command)
              (insert input))
-         (call-interactively command))))
-    (abort-recursive-edit)))
-
-(defun adh--rename-mode (mode name)
-  "Set MODE's mode-line lighter to NAME."
-  (when-let* ((entry (assq mode minor-mode-alist)))
-    (setcdr entry (list name))))
+         (call-interactively command))))))
 
 (defun adh--with-saved-window (fn)
   "Call FN interactively without letting it change the selected window."
@@ -34,6 +84,14 @@
 (defun adh--half-window-height ()
   "Return half the current window's body height, at least 1."
   (max 1 (/ (window-body-height) 2)))
+
+(defun adh--get-project-dir (&optional dir)
+  "Return the nearest ancestor of DIR with one of `adh-project-root-markers'."
+  (locate-dominating-file (or dir default-directory)
+   (lambda (d)
+     (seq-some (lambda (marker)
+                 (file-exists-p (file-name-concat d marker)))
+               adh-project-root-markers))))
 
 (defun adh--buffer-file-name ()
   "Return the current buffer's file, or the file at point in Dired."
@@ -67,12 +125,10 @@
       (insert "\n"))
     (let ((new-start (point)))
       (insert text)
-      (if use-region
-          (progn
-            (set-mark (+ new-start mark-offset))
-            (goto-char (+ new-start point-offset))
-            (setq deactivate-mark nil))
-        (goto-char (+ new-start point-offset))))))
+      (when use-region
+        (set-mark (+ new-start mark-offset))
+        (setq deactivate-mark nil))
+      (goto-char (+ new-start point-offset)))))
 
 (defun adh--popup-buffer-p (buf)
   "Return non-nil if BUF matches an entry of `adh-popup-buffers'."
@@ -83,43 +139,18 @@
                   (derived-mode-p entry)))
               adh-popup-buffers)))
 
-(defun adh--snake-to-pascal (str)
-  "Convert snake_case STR to PascalCase."
-  (mapconcat #'capitalize
-             (split-string str "_" t)
-             ""))
-
-(defun adh--camel-to-snake (str)
-  "Convert camelCase or PascalCase STR to snake_case."
-  (let ((case-fold-search nil))
-    (downcase
-     (replace-regexp-in-string
-      "\\([a-z0-9]\\)\\([A-Z]\\)"
-      "\\1_\\2"
-      str))))
-
-(defun adh--toggle-case-string (str)
-  "Toggle STR between snake_case and PascalCase."
-  (if (string-match-p "_" str)
-      (adh--snake-to-pascal str)
-    (adh--camel-to-snake str)))
-
 (defun adh--apply-font (family height &optional frame)
-  "Set the default face to FAMILY at HEIGHT in FRAME.
-Return non-nil on success, nil if non-graphical or the font is missing."
-  (with-selected-frame (or frame (selected-frame))
-    (if (and (display-graphic-p)
-             (find-font (font-spec :family family)))
-        (progn
-          (set-face-attribute 'default nil :family family :height height)
-          (set-face-attribute 'fixed-pitch nil :family family)
-          t)
-      nil)))
+  "Set the default face to FAMILY at HEIGHT if FRAME can display it.
+Return nil on a terminal or if the font is missing."
+  (when (and (display-graphic-p frame)
+             (find-font (font-spec :family family) frame))
+    (set-face-attribute 'default nil :family family :height height)
+    (set-face-attribute 'fixed-pitch nil :family family)
+    t))
 
 (defun adh--apply-frame-parameter (parameter value)
-  "Set frame PARAMETER to VALUE for the current and all future frames."
-  (set-frame-parameter nil parameter value)
-  (setf (alist-get parameter default-frame-alist) value))
+  "Set frame PARAMETER to VALUE for all current and future frames."
+  (modify-all-frames-parameters (list (cons parameter value))))
 
 (defun adh-scroll-up-half ()
   "Move point up half a window and recenter."
@@ -160,16 +191,15 @@ Return non-nil on success, nil if non-graphical or the font is missing."
           (goto-char (mark))
           (if mark-is-below
               (progn
-                (forward-line steps)
-                (end-of-line))
-            (forward-line (- steps))
-            (beginning-of-line))
+                (forward-line (if (bolp) (1- steps) steps))
+                (if (eolp) (forward-line 1) (end-of-line)))
+            (forward-line (- steps)))
           (set-mark (point)))))))
 
 (defun adh-duplicate-dwim (&optional n)
-  "Duplicate the current line, or the region extended to whole lines, N times."
+  "Duplicate the line, or the region's whole lines, N times."
   (interactive "p")
-  (when (use-region-p)
+  (when (and (use-region-p) (not (bound-and-true-p rectangle-mark-mode)))
     (let ((beg (save-excursion (goto-char (region-beginning))
                                (line-beginning-position))))
       (goto-char (region-end))
@@ -189,22 +219,27 @@ Return non-nil on success, nil if non-graphical or the font is missing."
   (backward-char)
   (exchange-point-and-mark))
 
+(defun adh--indent-line ()
+  "Indent the current line for the mode, falling back like TAB where it declines."
+  (when (eq (indent-according-to-mode) 'noindent)
+    (or (indent--default-inside-comment) (indent-relative))))
+
 (defun adh-insert-line-above ()
   "Open and indent a new line above the current one."
   (interactive)
   (beginning-of-line)
   (open-line 1)
-  (indent-for-tab-command))
+  (adh--indent-line))
 
 (defun adh-insert-line-below ()
   "Open and indent a new line below the current one."
   (interactive)
   (end-of-line)
   (newline)
-  (indent-for-tab-command))
+  (adh--indent-line))
 
 (defun adh-join-line-above ()
-  "Join the current line to the one above."
+  "Join the following line to the current one."
   (interactive)
   (join-line -1))
 
@@ -212,20 +247,21 @@ Return non-nil on success, nil if non-graphical or the font is missing."
   "Delete the active region, or the previous character when there is none."
   (interactive)
   (if (use-region-p)
-      (delete-region (region-beginning) (region-end))
+      (delete-active-region)
     (delete-char -1)))
 
 (defun adh-kill-line-above ()
   "Kill the whole line above point."
   (interactive)
-  (forward-line -1)
-  (kill-whole-line))
+  (unless (= (pos-bol) (point-min))
+    (forward-line -1)
+    (kill-whole-line)))
 
 (defun adh-kill-region-or-line ()
   "Kill the active region, or to end of line when there is none."
   (interactive)
   (if (use-region-p)
-      (kill-region (region-beginning) (region-end))
+      (kill-region (region-beginning) (region-end) 'region)
     (kill-line)))
 
 (defun adh-sort-u ()
@@ -245,60 +281,21 @@ Return non-nil on success, nil if non-graphical or the font is missing."
       (insert-pair 1 char close))))
 
 (defun adh-down-list (&optional n)
-  "Move forward and down into the next list, N times.
-Unlike `down-list', step over sexps that open no sublist instead of
-erroring, so point lands inside the next list ahead."
+  "Move into the next list N times, stepping over atoms `down-list' errors on."
   (interactive "p")
-  (let ((count (or n 1)))
-    (dotimes (_ count)
-      (let (done)
-        (while (not done)
-          (let ((pt (point)))
-            (or
-             (ignore-errors
-               (down-list 1)
-               (setq done t))
-             (progn
-               (ignore-errors
-                 (backward-up-list 1)
-                 (forward-sexp 1)
-                 (skip-syntax-forward " >"))
-               (when (= (point) pt)
-                 (setq done t))))))))))
-
-(defun adh-toggle-func-case-at-region (start end)
-  "Toggle the text between START and END between snake_case and PascalCase."
-  (interactive "r")
-  (atomic-change-group
-    (let* ((text (delete-and-extract-region start end))
-           (new-text (adh--toggle-case-string text)))
-      (insert new-text))))
-
-(defun adh-toggle-func-case-at-point ()
-  "Toggle the symbol at point (or region) between snake_case and PascalCase."
-  (interactive)
-  (let ((bounds (if (use-region-p)
-                    (cons (region-beginning) (region-end))
-                  (bounds-of-thing-at-point 'symbol))))
-    (when bounds
-      (adh-toggle-func-case-at-region (car bounds) (cdr bounds)))))
-
-(defun adh-split-below-root ()
-  "Split the frame's root window below."
-  (interactive)
-  (split-window (frame-root-window) nil 'below))
-
-(defun adh-split-right-root ()
-  "Split the frame's root window to the right."
-  (interactive)
-  (split-window (frame-root-window) nil 'right))
+  (dotimes (_ (or n 1))
+    (while (condition-case nil
+               (progn (down-list 1) nil)
+             (error (let ((pt (point)))
+                      (ignore-errors
+                        (backward-up-list 1)
+                        (forward-sexp 1)
+                        (skip-syntax-forward " >"))
+                      (/= (point) pt)))))))
 
 (defun adh--popper-window-height (win)
-  "Set the height of popup window WIN.
-Popups whose text is complete, like help or exports, fit their text,
-up to `adh-list-max-height' lines.  Compile, grep and shell buffers
-get that full height at once, or as much as the frame allows, since
-their output arrives later."
+  "Set popup window WIN's height, capped at `adh-list-max-height'.
+Output buffers (compile, grep, shell) get the cap up front; others fit."
   (let* ((buf (window-buffer win))
          (max adh-list-max-height)
          (room (+ (window-total-height win) (window-max-delta win)))
@@ -307,7 +304,7 @@ their output arrives later."
     (fit-window-to-buffer win max (and growing (min max room)))))
 
 (defun adh--popper-display (buffer &optional alist)
-  "Show popup BUFFER where it is visible, else at the bottom, and select it."
+  "Show popup BUFFER where visible, else at the bottom, and select it."
   (let ((win (or (display-buffer-reuse-window buffer alist)
                  (popper-display-popup-at-bottom
                   buffer (append alist '((window-parameters . ((no-other-window . t)))))))))
@@ -323,8 +320,7 @@ their output arrives later."
     (popper-toggle)))
 
 (defun adh-popup-toggle-type ()
-  "Turn the popup into a normal window, or the current buffer into a popup.
-The normal window opens at the bottom with the popup's height."
+  "Turn the popup into a bottom window, or the current buffer into a popup."
   (interactive)
   (let ((display-buffer-overriding-action
          (if (memq popper-popup-status '(popup user-popup))
@@ -339,10 +335,8 @@ The normal window opens at the bottom with the popup's height."
              (lambda (a b) (> (window-use-time a) (window-use-time b))))))
 
 (defun adh-delete-other-windows ()
-  "Delete other windows, leaving side panels such as treemacs in place.
-From the bottom window its buffer fills the frame but stays a popup, so
-it goes back to the bottom the next time it is shown.  From a side panel
-the most recently used window is kept."
+  "Delete other windows, keeping side panels such as treemacs.
+A popup stays a popup; from a side panel, the last used window stays."
   (interactive)
   (let ((win (selected-window)))
     (if (not (window-parameter win 'window-side))
@@ -366,9 +360,8 @@ the most recently used window is kept."
   "Return non-nil when BUF should appear in buffer switching."
   (and (buffer-live-p buf)
        (not (string-match-p "\\`[ *]" (buffer-name buf)))
-       (not (apply #'provided-mode-derived-p
-                   (buffer-local-value 'major-mode buf)
-                   adh-hidden-buffer-modes))))
+       (not (provided-mode-derived-p (buffer-local-value 'major-mode buf)
+                                     adh-hidden-buffer-modes))))
 
 (defun adh-switch-to-buffer ()
   "Switch to a buffer, hiding internal ones and `adh-hidden-buffer-modes'."
@@ -378,7 +371,7 @@ the most recently used window is kept."
                 #'(lambda (arg) (adh--buffer-listable-p (cdr arg))))))
 
 (defun adh-kill-other-buffers ()
-  "Kill all buffers except visible ones, *scratch*, *Messages* and internal buffers."
+  "Kill every buffer except visible ones, *scratch*, *Messages* and internals."
   (interactive)
   (let ((keep (append (mapcar #'window-buffer (window-list-1 nil nil t))
                       (list (get-buffer "*scratch*")
@@ -399,7 +392,8 @@ the most recently used window is kept."
   (let ((count 0))
     (dolist (buf (buffer-list))
       (let ((name (buffer-name buf)))
-        (when (and (not (eq buf (current-buffer)))
+        (when (and name
+                   (not (eq buf (current-buffer)))
                    (or internal-too
                        (not (string-prefix-p " " name)))
                    (string-match-p regexp name))
@@ -422,28 +416,19 @@ the most recently used window is kept."
     str))
 
 (defun adh-copy-file-name (&optional marked)
-  "Copy the current buffer's file name (or buffer name) to the kill ring.
-With MARKED (non-nil interactively), copy the names of the files marked
-in Dired instead, when there are any."
+  "Copy the file name, or buffer name, to the kill ring.
+With MARKED, copy the names of marked Dired files, if any."
   (interactive (list t))
-  (let (files f)
-    (cond
-     ((setq files (and marked (adh--dired-marked-files)))
-      (adh--copy-marked (mapcar #'file-name-nondirectory files)))
-     ((setq f (adh--buffer-file-name))
-      (let ((name (file-name-nondirectory f)))
-        (kill-new name)
-        (message "Copied %s" name)
-        name))
-     (t
-      (let ((name (buffer-name)))
-        (kill-new name)
-        (message "Copied buffer name %s" name)
-        name)))))
+  (if-let* ((files (and marked (adh--dired-marked-files))))
+      (adh--copy-marked (mapcar #'file-name-nondirectory files))
+    (let* ((file (adh--buffer-file-name))
+           (name (if file (file-name-nondirectory file) (buffer-name))))
+      (kill-new name)
+      (message (if file "Copied %s" "Copied buffer name %s") name)
+      name)))
 
 (defun adh-copy-path (&optional resolve)
-  "Copy the current file's directory to the kill ring.
-With RESOLVE (prefix arg), follow symlinks."
+  "Copy the file's directory to the kill ring; RESOLVE follows symlinks."
   (interactive "P")
   (let* ((file (or (adh--buffer-file-name) default-directory))
          (dir  (file-name-directory (expand-file-name file)))
@@ -453,10 +438,8 @@ With RESOLVE (prefix arg), follow symlinks."
     path))
 
 (defun adh-copy-full-path (&optional resolve marked)
-  "Copy the current file's full path to the kill ring.
-With RESOLVE (prefix arg), follow symlinks.  With MARKED (non-nil
-interactively), copy the paths of the files marked in Dired instead,
-when there are any."
+  "Copy the file's full path to the kill ring; RESOLVE follows symlinks.
+With MARKED, copy the paths of marked Dired files, if any."
   (interactive (list current-prefix-arg t))
   (if-let* ((files (and marked (adh--dired-marked-files))))
       (adh--copy-marked (mapcar (lambda (f) (adh--maybe-truename f resolve)) files))
@@ -466,12 +449,14 @@ when there are any."
       (message "Copied %s" path)
       path)))
 
-(defun adh--dired-sort-toggle-or-edit-windows ()
-  "Like `dired-sort-toggle-or-edit', but force the external ls.
-Needed on Windows, where ls-lisp otherwise ignores the sort switches."
-  (interactive)
-  (let ((ls-lisp-use-insert-directory-program t))
-    (dired-sort-toggle-or-edit)))
+(defun adh-dired-sort-toggle-or-edit (&optional arg)
+  "`dired-sort-toggle-or-edit' with ARG, via external ls on Windows.
+ls-lisp ignores sort switches."
+  (interactive "P" dired-mode)
+  (if (eq system-type 'windows-nt)
+      (let ((ls-lisp-use-insert-directory-program t))
+        (dired-sort-toggle-or-edit arg))
+    (dired-sort-toggle-or-edit arg)))
 
 (defun adh-dired-or-file ()
   "In Dired, open a file; elsewhere, jump to the current file in Dired."
@@ -481,8 +466,7 @@ Needed on Windows, where ls-lisp otherwise ignores the sort switches."
     (dired-jump)))
 
 (defun adh-dired-duplicate-dwim ()
-  "Copy each marked Dired file or directory to a `_copy' sibling.
-A numeric suffix is added as needed to avoid overwriting."
+  "Copy each marked file or directory to a numbered `_copy' sibling."
   (interactive)
   (let ((files (dired-get-marked-files t current-prefix-arg)))
     (dolist (file files)
@@ -509,51 +493,44 @@ A numeric suffix is added as needed to avoid overwriting."
     (revert-buffer)
     (message "Duplicated %d item(s)." (length files))))
 
-;; Use the external-ls variant on Windows, the builtin command elsewhere.
-(defalias 'adh-dired-sort-toggle-or-edit
-  (if (eq system-type 'windows-nt)
-      #'adh--dired-sort-toggle-or-edit-windows
-    #'dired-sort-toggle-or-edit))
-
-(defun adh-set-window-decoration (decorated)
+(defun adh--apply-window-decoration (decorated)
   "Show or hide the window-manager frame decorations per DECORATED."
-  (setq adh-window-decoration decorated)
   (adh--apply-frame-parameter 'undecorated (not decorated)))
 
-(defun adh-set-frame-opacity (opacity)
-  "Set frame OPACITY (0-100) for the current and future frames."
-  (setq adh-frame-opacity opacity)
-  (adh--apply-frame-parameter 'alpha adh-frame-opacity))
+(defun adh--apply-frame-opacity (opacity)
+  "Set frame OPACITY (0-100); background only, except on Windows and macOS."
+  (adh--apply-frame-parameter
+   ;; `alpha' is a window-manager hint; Hyprland ignores it.
+   (if (memq system-type '(windows-nt darwin)) 'alpha 'alpha-background)
+   opacity)
+  (force-mode-line-update t))
 
-(defun adh-set-list-max-height (lines)
+(defun adh--apply-list-max-height (lines)
   "Show at most LINES lines in vertico, the *Completions* list and popups."
-  (setq adh-list-max-height lines
-        vertico-count lines
+  (setq vertico-count lines
         completions-max-height lines))
 
-(defun adh-set-font (family height)
-  "Set the default font to FAMILY at HEIGHT, including for future frames."
-  (when adh--font-hook (remove-hook 'after-make-frame-functions adh--font-hook))
-  (setq adh--font-hook
-        (lambda (frame)
-          (unless (adh--apply-font family height frame)
-            (when (display-graphic-p frame)
-              (message "[adh] Warning: Queued font '%s' not found." family)))))
-  (add-hook 'after-make-frame-functions adh--font-hook)
-  (if (adh--apply-font family height (selected-frame))
-      (message "[adh] Set font '%s'" family)
-    (if (display-graphic-p)
-        (message "[adh] Font not found: '%s'" family)
-      (message "[adh] Queued font '%s'" family))))
+(defun adh--apply-queued-font (frame)
+  "Apply `adh-mono-spaced-font' to new FRAME, unhooking once it succeeds."
+  (cond ((adh--apply-font adh-mono-spaced-font adh-mono-spaced-font-size frame)
+         (remove-hook 'after-make-frame-functions #'adh--apply-queued-font))
+        ((display-graphic-p frame)
+         (message "[adh] Warning: Queued font '%s' not found." adh-mono-spaced-font))))
 
-(defun adh-toggle-window-decorations ()
-  "Toggle the window-manager frame decorations."
-  (interactive)
-  (adh-set-window-decoration (not adh-window-decoration)))
+(defun adh--apply-font-settings (&rest _)
+  "Apply `adh-mono-spaced-font' and its size, also to future frames."
+  (if (adh--apply-font adh-mono-spaced-font adh-mono-spaced-font-size)
+      (progn
+        (remove-hook 'after-make-frame-functions #'adh--apply-queued-font)
+        (message "[adh] Set font '%s'" adh-mono-spaced-font))
+    (add-hook 'after-make-frame-functions #'adh--apply-queued-font)
+    (if (display-graphic-p)
+        (message "[adh] Font not found: '%s'" adh-mono-spaced-font)
+      (message "[adh] Queued font '%s'" adh-mono-spaced-font))))
 
 (defun adh-set-file-extension-mode (ext mode)
   "Open files with extension EXT in MODE."
-  (add-to-list 'auto-mode-alist (cons (format "\\.%s\\'" ext) mode)))
+  (add-to-list 'auto-mode-alist (cons (format "\\.%s\\'" (regexp-quote ext)) mode)))
 
 (defun adh-add-to-path (path)
   "Prepend PATH to both `exec-path' and the PATH environment variable."
@@ -563,20 +540,18 @@ A numeric suffix is added as needed to avoid overwriting."
       (unless (member expanded-path (split-string current-path path-separator))
         (setenv "PATH" (concat expanded-path path-separator current-path))))))
 
-(defun adh-add-root-marker (name)
-  "Add NAME to `adh-project-root-markers'."
-  (add-to-list 'adh-project-root-markers name))
-
 (defun adh-get-executable ()
   "Get an executable on PATH and jump to it in Dired."
   (interactive)
   (let* ((exec-path (if (eq system-type 'windows-nt) (remove "." exec-path) exec-path))
+         (dirs (make-hash-table :test #'equal))
          (completion-extra-properties
           `(:group-function
             ,(lambda (cand transform)
                (if transform cand
-                 (if-let* ((path (locate-file cand exec-path '() 'file-executable-p)))
-                     (file-name-directory path) "non-executable")))))
+                 (with-memoization (gethash cand dirs)
+                   (if-let* ((path (locate-file cand exec-path '() 'file-executable-p)))
+                       (file-name-directory path) "non-executable"))))))
          (exe (completing-read "Exe: " (apply-partially #'locate-file-completion-table exec-path '()) nil t)))
     (dired-jump nil (locate-file exe exec-path '()))))
 
@@ -618,33 +593,25 @@ A numeric suffix is added as needed to avoid overwriting."
 (defun adh-tmux-cd (&optional target)
   "Send a `cd' to Emacs's current directory to tmux, asynchronously."
   (interactive)
-  (let* ((buf (window-buffer (selected-window)))
-         (dir-path (with-current-buffer buf
-                     (or (and buffer-file-name
-                              (file-name-directory buffer-file-name))
-                         default-directory)))
-         (is-windows (eq system-type 'windows-nt))
-         (abs-path (if is-windows
-                       dir-path
-                     (expand-file-name dir-path)))
-         (unix-path (if (and is-windows
-                             (string-match "^\\([a-zA-Z]\\):" abs-path))
-                        (concat "/" (downcase (match-string 1 abs-path))
-                                (substring abs-path 2))
-                      abs-path))
-         (dest (or target adh-tmux-cd-session))
-         (tflag (if dest (concat " -t " (shell-quote-argument dest)) "")))
+  (let* ((dir (with-current-buffer (window-buffer (selected-window))
+                (or (and buffer-file-name (file-name-directory buffer-file-name))
+                    default-directory)))
+         (path (cond ((not (eq system-type 'windows-nt)) (expand-file-name dir))
+                     ((string-match "^\\([a-zA-Z]\\):" dir)
+                      (concat "/" (downcase (match-string 1 dir)) (substring dir 2)))
+                     (t dir)))
+         (dest (or target adh-tmux-cd-session)))
     (start-process-shell-command
      "adh-tmux-cd" nil
-     (format "%s send-keys%s 'cd %s' C-m"
-             adh--tmux-command tflag
-             (shell-quote-argument (directory-file-name unix-path))))
+     (format "%s send-keys%s 'cd %s' C-m" adh--tmux-command
+             (if dest (concat " -t " (shell-quote-argument dest)) "")
+             (shell-quote-argument (directory-file-name path))))
     (when (called-interactively-p 'interactive)
-      (message "tmux directory -> '%s'" unix-path))
-    unix-path))
+      (message "tmux directory -> '%s'" path))
+    path))
 
 (defun adh-kill-process (&optional sigkill)
-  "Pick a system process and signal it: SIGTERM, or SIGKILL with a prefix arg."
+  "Signal a chosen process: SIGTERM, or SIGKILL with a prefix arg."
   (interactive "P")
   (let* ((kill (or sigkill (eq system-type 'windows-nt)))
          (cands
@@ -666,7 +633,7 @@ A numeric suffix is added as needed to avoid overwriting."
                                 pid))))
                  (list-system-processes))))
          (choice (completing-read
-                  (format "Kill [%s]: " (if kill "KILL" "TERM"))
+                  (format "Kill (%s): " (if kill "KILL" "TERM"))
                   cands nil t))
          (pid (cdr (assoc choice cands))))
     (when pid
@@ -674,11 +641,54 @@ A numeric suffix is added as needed to avoid overwriting."
         (signal-process pid sig)
         (message "Sent %s to %d" sig pid)))))
 
-(defun adh-compile-region (start end)
-  "Run the region between START and END as a `compile' command."
-  (interactive "r")
-  (let ((command (buffer-substring-no-properties start end)))
-    (compile command)))
+(defvar adh--command-origin-dir nil
+  "Directory a project command was invoked from, before moving to the root.")
+
+(defvar adh--shell-prompt-dir nil
+  "When set, adh labels compile and shell prompts with this directory.")
+
+(defun adh--origin-dir ()
+  "Directory the current command started from, before any move to a root.
+Falls back to the directory of the file or Dired buffer the minibuffer serves."
+  (or adh--command-origin-dir
+      (with-current-buffer (window-buffer (or (minibuffer-selected-window) (selected-window)))
+        (cond (buffer-file-name (file-name-directory buffer-file-name))
+              ((derived-mode-p 'dired-mode) (dired-current-directory))
+              (t default-directory)))))
+
+(defun adh-shell-command-dir-pivot (&optional dir)
+  "Rerun the current compile or shell command prompt in DIR, or one read."
+  (interactive)
+  (let ((input (minibuffer-contents-no-properties))
+        (origin (adh--origin-dir))
+        (command (pcase (minibuffer-prompt)
+                   ((rx bos "Compile" (or " command: " " (")) #'compile)
+                   ((rx bos "Async shell" (or " command: " " command in " " (")) #'async-shell-command)
+                   ((rx bos "Shell" (or " command: " " command in " " (")) #'shell-command)
+                   (_ (user-error "No directory pivot for this prompt")))))
+    (adh--minibuffer-pivot-call
+     (lambda ()
+       (let* ((adh--command-origin-dir origin)
+              (default-directory (or dir
+                                     (let ((use-dialog-box nil))
+                                       (expand-file-name (read-directory-name "Run in: " origin nil t)))))
+              (adh--shell-prompt-dir default-directory))
+         (minibuffer-with-setup-hook
+             (lambda ()
+               (delete-minibuffer-contents)
+               (insert input))
+           (call-interactively command)))))))
+
+(defun adh-shell-command-root-pivot ()
+  "Rerun the current compile or shell command prompt at the project root.
+When it already runs there, rerun it in the directory it started from."
+  (interactive)
+  (let* ((origin (adh--origin-dir))
+         (root (adh--get-project-dir origin))
+         (dir (if (and root (not (file-equal-p default-directory root))) root origin)))
+    (if (file-equal-p dir default-directory)
+        (user-error (if root "Already at the project root" "Not in a project"))
+      (adh-shell-command-dir-pivot dir))))
 
 (defun adh-completion-in-region-isearch()
   "Jump to the *Completions* window and start isearch."
@@ -686,28 +696,23 @@ A numeric suffix is added as needed to avoid overwriting."
   (select-window (get-buffer-window "*Completions*" t))
   (isearch-forward))
 
-(defun adh--prescient-remember (candidate)
-  "Record CANDIDATE with prescient, when prescient is loaded."
-  (when (and candidate (fboundp 'prescient-remember))
-    (prescient-remember candidate)))
-
 (defun adh-completion-choose ()
-  "Choose the selected *Completions* candidate, or the first one, and record it."
+  "Choose the selected or first *Completions* candidate and record it."
   (interactive)
   (let ((candidate (with-minibuffer-completions-window
                      (unless (get-text-property (point) 'completion--string)
                        (first-completion))
                      (car (completion-list-candidate-at-point)))))
     (minibuffer-choose-completion)
-    (adh--prescient-remember candidate)))
+    (when (and candidate (fboundp 'prescient-remember))
+      (prescient-remember candidate))))
 
 (defun adh--completions-key (cmd)
-  "Return a binding that runs CMD while the *Completions* list is visible.
-Otherwise the key keeps its usual binding."
+  "Return a binding that runs CMD only while *Completions* is visible."
   `(menu-item "" ,cmd :filter ,(lambda (c) (and (minibuffer--completions-visible) c))))
 
 (defun adh--completions-preselect-first ()
-  "Treat the first *Completions* candidate as selected, so the next key moves past it."
+  "Treat the first *Completions* candidate as selected."
   (with-current-buffer standard-output
     (when (get-text-property (point-min) 'mouse-face)
       (let ((inhibit-read-only t))
@@ -719,22 +724,95 @@ Otherwise the key keeps its usual binding."
   (call-interactively #'isearch-occur)
   (isearch-done))
 
+(defun adh--occur-source-buffers ()
+  "Return the buffers the lines of the current Occur buffer come from."
+  (save-restriction
+    (widen)
+    (let ((pos (point-min)) bufs)
+      (while pos
+        (when-let* ((target (get-text-property pos 'occur-target))
+                    (buf (marker-buffer (if (consp target) (caar target) target))))
+          (setq buf (or (buffer-base-buffer buf) buf))
+          (unless (memq buf bufs)
+            (push buf bufs)))
+        (setq pos (next-single-property-change pos 'occur-target)))
+      bufs)))
+
+(defun adh--occur-edit-plain-input (beg end _old-len)
+  "Strip faces from the text inserted between BEG and END."
+  (with-silent-modifications
+    (remove-text-properties beg end '(face nil font-lock-face nil))))
+
+(defun adh--occur-edit-start ()
+  "Record this `occur-edit-mode' session's edits, also in the sources, for undo."
+  (dolist (buf (buffer-list))
+    (when (buffer-local-value 'adh--occur-edit-changes buf)
+      (with-current-buffer buf
+        (occur-mode)
+        (set-buffer-modified-p nil))))
+  (let ((bufs (adh--occur-source-buffers)))
+    (setq adh--occur-edit-ticks
+          (mapcar (lambda (buf) (cons buf (buffer-chars-modified-tick buf))) bufs)
+          adh--occur-edit-changes
+          (mapcan #'prepare-change-group
+                  (cons (current-buffer)
+                        (seq-remove (lambda (buf)
+                                      (or (buffer-local-value 'buffer-read-only buf)
+                                          (get-buffer-process buf)))
+                                    bufs)))))
+  (activate-change-group adh--occur-edit-changes)
+  (dolist (elt adh--occur-edit-changes)
+    (with-current-buffer (car elt)
+      (setq-local undo-limit most-positive-fixnum
+                  undo-strong-limit most-positive-fixnum
+                  undo-outer-limit nil)))
+  (add-hook 'after-change-functions #'adh--occur-edit-plain-input nil t)
+  (add-hook 'change-major-mode-hook #'adh--occur-edit-end nil t)
+  (add-hook 'kill-buffer-hook #'adh--occur-edit-end nil t))
+
+(add-hook 'occur-edit-mode-hook #'adh--occur-edit-start)
+
+(defun adh--occur-edit-end (&optional abort)
+  "Close the change group of this `occur-edit-mode' session, undoing it when ABORT."
+  (let ((changes adh--occur-edit-changes)
+        (after-change-functions nil))
+    (setq adh--occur-edit-changes nil)
+    (dolist (elt changes)
+      (when (buffer-live-p (car elt))
+        (with-demoted-errors "[adh] Occur edit: %S"
+          (if abort (cancel-change-group (list elt)) (accept-change-group (list elt))))
+        (with-current-buffer (car elt)
+          (mapc #'kill-local-variable '(undo-limit undo-strong-limit undo-outer-limit)))))))
+
+(defun adh-occur-edit-abort ()
+  "Undo the edits made in `occur-edit-mode', also in the sources, and leave it."
+  (interactive)
+  (adh--occur-edit-end t)
+  (occur-cease-edit)
+  (set-buffer-modified-p nil))
+
+(defun adh-occur-edit-save ()
+  "Leave `occur-edit-mode' and save the source files edited in it."
+  (interactive)
+  (let ((ticks adh--occur-edit-ticks))
+    (occur-cease-edit)
+    (set-buffer-modified-p nil)
+    (dolist (tick ticks)
+      (let ((buf (car tick)))
+        (when (and (buffer-live-p buf) (buffer-file-name buf) (buffer-modified-p buf)
+                   (/= (cdr tick) (buffer-chars-modified-tick buf)))
+          (with-current-buffer buf (save-buffer)))))))
+
+(defun adh--pcre-quote (string)
+  "Escape STRING to match literally as a PCRE or Python regexp."
+  (replace-regexp-in-string (rx (any "\\.^$|?*+()[]{}")) "\\\\\\&" string))
+
 (defun adh-minibuffer-next-history-or-clear (n)
-  "Insert the next history element, or clear the minibuffer at end of history."
+  "Insert the next history element, or clear the input past the end."
   (interactive "p")
   (condition-case nil
       (next-history-element n)
     (error (delete-minibuffer-contents))))
-
-(defun adh-apropos ()
-  "Run `apropos' on the region or symbol at point, prompting if there is none."
-  (interactive)
-  (let ((search-term (if (use-region-p)
-                         (buffer-substring-no-properties (region-beginning) (region-end))
-                       (thing-at-point 'symbol t))))
-    (if search-term
-        (apropos search-term)
-      (call-interactively 'apropos))))
 
 (defun adh-show-buffer-file-encoding ()
   "Show the current buffer's file coding system."
@@ -747,41 +825,5 @@ Otherwise the key keeps its usual binding."
   (if (> (minibuffer-depth) 0)
       (abort-recursive-edit)
     (keyboard-quit)))
-
-(defun adh-subword-toggle ()
-  "Toggle camelCase-aware word motion and display.
-Turns `subword-mode' (so word commands stop at camelCase boundaries) and
-`glasses-mode' (which visually separates those humps) on or off together."
-  (interactive)
-  (glasses-mode 'toggle)
-  (subword-mode 'toggle))
-
-(defun adh--ide-mode-p ()
-  "Return non-nil when every part of the IDE stack is on."
-  (and (adh--cmp-auto-p)
-       (adh--eglot-flymake-p)
-       (adh--eglot-format-on-save-p)
-       adh--eglot-global-enabled))
-
-(defun adh-set-ide-mode (on)
-  "Turn the IDE stack (completion, eglot, flymake and format-on-save) ON or off."
-  (require 'eglot)
-  (if on
-      (progn
-        (adh--set-cmp-auto t)
-        (adh--eglot-set-flymake t)
-        (adh--eglot-set-format-on-save t)
-        (adh--eglot-set-global t))
-    (adh--eglot-set-global nil)
-    (adh--eglot-set-flymake nil)
-    (adh--eglot-set-format-on-save nil)
-    (adh--set-cmp-auto nil)))
-
-(defun adh-toggle-ide-mode ()
-  "Turn the whole IDE stack on, or off when all of it is already on."
-  (interactive)
-  (let ((on (not (adh--ide-mode-p))))
-    (adh-set-ide-mode on)
-    (message "[adh] IDE mode %s" (if on "on" "off"))))
 
 (provide 'adh-functions)

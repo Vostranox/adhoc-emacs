@@ -1,75 +1,151 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-(defun adh-set-completion-ui (ui)
-  "Switch the in-buffer completion UI."
-  (interactive (list (intern (completing-read "Select completion UI: " '(company corfu)))))
-  (when (bound-and-true-p global-corfu-mode) (global-corfu-mode 0))
-  (when (bound-and-true-p global-company-mode) (global-company-mode 0))
-  (setq adh-completion-ui ui)
-  (message "[adh] Completion UI set to %s" ui))
+(require 'adh-vars)
+
+(defvar corfu-auto)
+(defvar corfu-mode)
+(defvar corfu-map)
+(defvar corfu-preselect)
+(defvar corfu-cycle)
+(defvar corfu--index)
+(defvar corfu-auto-commands)
+(defvar vertico-multiform-categories)
+(defvar vertico-multiform-commands)
+
+(defun adh--completion-preview-trim (&rest _)
+  "Hide LSP label noise after the name in the preview, e.g. `push_back(…)'."
+  (when-let* (((bound-and-true-p eglot--managed-mode))
+              (ov (bound-and-true-p completion-preview--overlay))
+              (str (overlay-get ov 'after-string))
+              (i (string-match-p "[ (<]" str))
+              ((not (get-text-property i 'display str))))
+    (setq str (copy-sequence str))
+    (put-text-property i (length str) 'display "" str)
+    (overlay-put ov 'after-string str)))
+
+(defun adh--completion-set-corfu-auto (on)
+  "Make the Corfu popup open while typing when ON."
+  (unless (eq (bound-and-true-p corfu-auto) (and on t))
+    (setq corfu-auto (and on t))
+    (when (featurep 'corfu)
+      (dolist (buf (buffer-list))
+        (with-current-buffer buf
+          (when corfu-mode
+            (corfu-mode -1)
+            (corfu-mode 1)))))))
+
+(defun adh--apply-completion-style (style)
+  "Apply completion STYLE."
+  (adh--completion-set-corfu-auto (eq style 'full))
+  (if (eq style 'minimal)
+      (global-completion-preview-mode 1)
+    (when (bound-and-true-p global-completion-preview-mode)
+      (global-completion-preview-mode -1)))
+  (when (fboundp 'adh--eglot-sync)
+    (adh--eglot-sync)))
+
+(defun adh--completion-in-vertical-minibuffer (beg end table pred)
+  "Complete BEG to END in the minibuffer, listing candidates vertically."
+  (let ((vertico-multiform-categories nil)
+        (vertico-multiform-commands nil))
+    (consult-completion-in-region beg end table pred)))
+
+(defun adh--apply-completion-ui (ui)
+  "Show in-buffer completion in UI; see `adh-completion-ui'."
+  (if (eq ui 'popup)
+      (global-corfu-mode 1)
+    (when (bound-and-true-p global-corfu-mode)
+      (global-corfu-mode -1)))
+  (setq-default completion-in-region-function
+                (pcase ui
+                  ('minibuffer #'consult-completion-in-region)
+                  ('minibuffer-vertical #'adh--completion-in-vertical-minibuffer)
+                  (_ #'completion--in-region))))
 
 (defun adh-complete-at-point ()
-  "Complete at point: trigger company manually if active, else `completion-at-point'."
+  "Complete at point; the Corfu popup skips inserting the common prefix."
   (interactive)
-  (unless (and (bound-and-true-p company-mode)
-               (company-manual-begin))
+  (if (bound-and-true-p corfu-mode)
+      (let ((completion-in-region-function
+             (lambda (beg end table pred)
+               (corfu--setup beg end table pred)
+               t)))
+        (completion-at-point))
     (completion-at-point)))
 
-(defun adh--cmp-auto-p ()
-  "Return non-nil when automatic popup completion is on for the active UI."
-  (cond ((eq adh-completion-ui 'company)
-         (bound-and-true-p global-company-mode))
-        ((eq adh-completion-ui 'corfu)
-         (bound-and-true-p global-corfu-mode))))
+(defun adh--apply-completion-keys (keys)
+  "Set how the Corfu popup selects and accepts; see `adh-completion-keys'."
+  (let ((go (eq keys 'tab-and-go)))
+    (setq corfu-preselect (if go 'prompt 'first)
+          corfu-cycle go)
+    (when (featurep 'corfu)
+      (adh--apply-corfu-keymap keys))))
 
-(defun adh--set-cmp-auto (on)
-  "Turn automatic popup completion for the active UI ON or off."
-  (let ((arg (if on 1 -1)))
-    (cond ((eq adh-completion-ui 'company)
-           (global-company-mode arg))
-          ((eq adh-completion-ui 'corfu)
-           (global-corfu-mode arg)))))
+(defun adh--apply-corfu-keymap (keys)
+  "Bind the popup's TAB and RET for KEYS; see `adh-completion-keys'."
+  (let ((go (eq keys 'tab-and-go)))
+    (keymap-set corfu-map "TAB" (if go #'corfu-next #'corfu-insert))
+    (keymap-set corfu-map "<tab>" (if go #'corfu-next #'corfu-insert))
+    (keymap-set corfu-map "<backtab>" (and go #'corfu-previous))
+    (keymap-set corfu-map "RET"
+                (pcase keys
+                  ('tab-and-enter #'corfu-insert)
+                  ('tab-only nil)
+                  (_ `(menu-item "" corfu-insert
+                                 :filter ,(lambda (cmd) (and (>= corfu--index 0) cmd))))))))
 
-(defun adh-toggle-cmp-auto ()
-  "Toggle automatic popup completion for the active UI."
-  (interactive)
-  (adh--set-cmp-auto (not (adh--cmp-auto-p))))
+(defun adh-set-completion-style (style)
+  "Set `adh-completion-style' to STYLE for this session."
+  (interactive
+   (list (intern (completing-read "Completion style: " '("none" "minimal" "full") nil t))))
+  (customize-set-variable 'adh-completion-style style)
+  (message "[adh] Completion style: %s" style))
 
-(use-package company
-  :ensure t :defer t
-  :custom
-  (company-idle-delay 0.2)
-  (company-minimum-prefix-length 3))
+(defun adh-set-completion-ui (ui)
+  "Set `adh-completion-ui' to UI for this session."
+  (interactive
+   (list (intern (completing-read "Completion UI: "
+                                  '("popup" "minibuffer" "minibuffer-vertical" "default")
+                                  nil t))))
+  (customize-set-variable 'adh-completion-ui ui)
+  (message "[adh] Completion UI: %s" ui))
 
-(use-package company-posframe
-  :ensure t :after company
-  :custom
-  (company-posframe-quickhelp-delay nil)
+(defun adh-set-completion-keys (keys)
+  "Set `adh-completion-keys' to KEYS for this session."
+  (interactive
+   (list (intern (completing-read "Popup keys: " '("tab-and-go" "tab-only" "tab-and-enter") nil t))))
+  (customize-set-variable 'adh-completion-keys keys)
+  (message "[adh] Popup keys: %s" keys))
+
+(use-package completion-preview
+  :ensure nil :defer t
   :config
-  (adh--rename-mode 'company-posframe-mode "")
-  :hook
-  (company-mode . company-posframe-mode))
+  (add-to-list 'completion-preview-commands #'adh-backward-delete-char-dwim)
+  (add-hook 'completion-preview-inhibit-functions
+            (lambda () (bound-and-true-p completion-in-region-mode)))
+  (advice-add 'completion-preview--make-overlay :after #'adh--completion-preview-trim)
+  (advice-add 'completion-preview-next-candidate :after #'adh--completion-preview-trim))
+(with-eval-after-load 'corfu-auto
+  (add-to-list 'corfu-auto-commands #'adh-backward-delete-char-dwim))
+(with-eval-after-load 'yasnippet
+  (add-hook 'yas-keymap-disable-hook
+            (lambda () (bound-and-true-p completion-in-region-mode))))
 
 (use-package corfu
   :ensure t :defer t
   :custom
-  (corfu-auto t)
-  (corfu-auto-delay 0.2)
-  (corfu-auto-prefix 3)
   (global-corfu-minibuffer nil)
-  (corfu-preselect 'first)
-  (corfu-on-exact-match nil)
   (corfu-preview-current nil)
   (corfu-popupinfo-delay nil)
   :config
-  (defconst adh--corfu-mode-line-string " corfu")
-  (add-to-list 'minor-mode-alist '(corfu-mode adh--corfu-mode-line-string))
-
-  (setf (alist-get 'internal-border-width corfu--frame-parameters) 0
-        (alist-get 'child-frame-border-width corfu--frame-parameters) 0)
-  (setq corfu-bar-width 0.0 corfu-right-margin-width 0.0)
-  (put 'corfu--bar 'corfu--bmp nil)
-
+  (add-to-list 'minor-mode-alist '(corfu-mode (corfu-auto " corfu")))
+  (adh--apply-corfu-keymap adh-completion-keys)
+  (dolist (p '(alpha alpha-background))
+    (setf (alist-get p corfu--frame-parameters) 100))
+  (define-advice corfu--make-frame (:filter-return (frame) adh-fringe)
+    (when (frame-live-p frame)
+      (set-face-background 'fringe (face-background 'corfu-default nil t) frame))
+    frame)
   (corfu-echo-mode 1)
   (corfu-popupinfo-mode 1))
 
@@ -84,53 +160,53 @@
   (add-hook 'eglot-managed-mode-hook
             (lambda () (add-hook 'completion-at-point-functions #'adh-cape-file-no-ann nil t))))
 
+(adh--apply-completion-ui adh-completion-ui)
+(adh--apply-completion-keys adh-completion-keys)
+(adh--apply-completion-style adh-completion-style)
+
 (use-package kind-icon
-  :ensure t
-  :config
-  (with-eval-after-load 'company
-    (let* ((kind-func (lambda (cand) (company-call-backend 'kind cand)))
-           (formatter (kind-icon-margin-formatter `((company-kind . ,kind-func)))))
-      (defun adh--company-kind-icon-margin (cand _selected)
-        (funcall formatter cand))
-      (setq company-format-margin-function #'adh--company-kind-icon-margin)))
+  :ensure t :defer t
+  :init
   (with-eval-after-load 'corfu
     (add-to-list 'corfu-margin-formatters #'kind-icon-margin-formatter))
+  :custom
+  (kind-icon-default-face 'font-lock-function-name-face)
+  :config
+  (setq kind-icon-default-style (append kind-icon-default-style '(:collection "vscode")))
   (setq kind-icon-mapping
-        '((array          "a"   :icon "symbol-array"       :face font-lock-type-face              :collection "vscode")
-          (boolean        "b"   :icon "symbol-boolean"     :face font-lock-builtin-face           :collection "vscode")
-          (color          "#"   :icon "symbol-color"       :face success                          :collection "vscode")
-          (command        "cm"  :icon "chevron-right"      :face default                          :collection "vscode")
-          (constant       "co"  :icon "symbol-constant"    :face font-lock-constant-face          :collection "vscode")
-          (class          "c"   :icon "symbol-class"       :face font-lock-type-face              :collection "vscode")
-          (constructor    "cn"  :icon "symbol-method"      :face font-lock-function-name-face     :collection "vscode")
-          (enum           "e"   :icon "symbol-enum"        :face font-lock-builtin-face           :collection "vscode")
-          (enummember     "em"  :icon "symbol-enum-member" :face font-lock-builtin-face           :collection "vscode")
-          (enum-member    "em"  :icon "symbol-enum-member" :face font-lock-builtin-face           :collection "vscode")
-          (event          "ev"  :icon "symbol-event"       :face font-lock-warning-face           :collection "vscode")
-          (field          "fd"  :icon "symbol-field"       :face font-lock-variable-name-face     :collection "vscode")
-          (file           "f"   :icon "symbol-file"        :face font-lock-string-face            :collection "vscode")
-          (folder         "d"   :icon "folder"             :face font-lock-doc-face               :collection "vscode")
-          (function       "f"   :icon "symbol-method"      :face font-lock-function-name-face     :collection "vscode")
-          (interface      "if"  :icon "symbol-interface"   :face font-lock-type-face              :collection "vscode")
-          (keyword        "kw"  :icon "symbol-keyword"     :face font-lock-keyword-face           :collection "vscode")
-          (macro          "mc"  :icon "lambda"             :face font-lock-keyword-face)
-          (magic          "ma"  :icon "lightbulb-autofix"  :face font-lock-builtin-face           :collection "vscode")
-          (method         "m"   :icon "symbol-method"      :face font-lock-function-name-face     :collection "vscode")
-          (module         "{"   :icon "file-code-outline"  :face font-lock-preprocessor-face)
-          (numeric        "nu"  :icon "symbol-numeric"     :face font-lock-builtin-face           :collection "vscode")
-          (operator       "op"  :icon "symbol-operator"    :face font-lock-comment-delimiter-face :collection "vscode")
-          (param          "pa"  :icon "gear"               :face default                          :collection "vscode")
-          (property       "pr"  :icon "symbol-property"    :face font-lock-variable-name-face     :collection "vscode")
-          (reference      "rf"  :icon "library"            :face font-lock-variable-name-face     :collection "vscode")
-          (snippet        "S"   :icon "symbol-snippet"     :face font-lock-string-face            :collection "vscode")
-          (string         "s"   :icon "symbol-string"      :face font-lock-string-face            :collection "vscode")
-          (struct         "%"   :icon "symbol-structure"   :face font-lock-variable-name-face     :collection "vscode")
-          (text           "tx"  :icon "symbol-key"         :face font-lock-doc-face               :collection "vscode")
-          (typeparameter  "tp"  :icon "symbol-parameter"   :face font-lock-type-face              :collection "vscode")
-          (type-parameter "tp"  :icon "symbol-parameter"   :face font-lock-type-face              :collection "vscode")
-          (unit           "u"   :icon "symbol-ruler"       :face font-lock-constant-face          :collection "vscode")
-          (value          "v"   :icon "symbol-enum"        :face font-lock-builtin-face           :collection "vscode")
-          (variable       "va"  :icon "symbol-variable"    :face font-lock-variable-name-face     :collection "vscode")
-          (t              "."   :icon "question"           :face font-lock-warning-face           :collection "vscode"))))
+        '((array          "a"   :icon "symbol-array")
+          (boolean        "b"   :icon "symbol-boolean")
+          (color          "#"   :icon "symbol-color")
+          (command        "cm"  :icon "chevron-right")
+          (constant       "co"  :icon "symbol-constant")
+          (class          "c"   :icon "symbol-class")
+          (constructor    "cn"  :icon "symbol-method")
+          (enum           "e"   :icon "symbol-enum")
+          (enum-member    "em"  :icon "symbol-enum-member")
+          (event          "ev"  :icon "symbol-event")
+          (field          "fd"  :icon "symbol-field")
+          (file           "f"   :icon "symbol-file")
+          (folder         "d"   :icon "folder")
+          (function       "f"   :icon "symbol-method")
+          (interface      "if"  :icon "symbol-interface")
+          (keyword        "kw"  :icon "symbol-keyword")
+          (macro          "mc"  :icon "symbol-misc")
+          (magic          "ma"  :icon "lightbulb-autofix")
+          (method         "m"   :icon "symbol-method")
+          (module         "{"   :icon "symbol-namespace")
+          (numeric        "nu"  :icon "symbol-numeric")
+          (operator       "op"  :icon "symbol-operator")
+          (param          "pa"  :icon "gear")
+          (property       "pr"  :icon "symbol-property")
+          (reference      "rf"  :icon "library")
+          (snippet        "S"   :icon "symbol-snippet")
+          (string         "s"   :icon "symbol-string")
+          (struct         "%"   :icon "symbol-structure")
+          (text           "tx"  :icon "symbol-key")
+          (type-parameter "tp"  :icon "symbol-parameter")
+          (unit           "u"   :icon "symbol-ruler")
+          (value          "v"   :icon "symbol-enum")
+          (variable       "va"  :icon "symbol-variable")
+          (t              "."   :icon "question"))))
 
 (provide 'adh-completion)

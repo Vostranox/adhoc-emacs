@@ -1,186 +1,11 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-(defvar consult-fd-args)
-(defvar consult-preview-key)
+(require 'adh-functions)
 
-(with-eval-after-load 'consult-register
-  (cl-defmethod consult-register--describe ((val marker))
-    "Describe marker register VAL as aligned \"buffer:line │ content\"."
-    (pcase-let ((`(,buf-width . ,line-width)
-                 (cl-loop for (_ . m) in (consult-register--alist 'noerror) if (markerp m)
-                          maximize (length (buffer-name (marker-buffer m))) into bw and
-                          maximize (length (number-to-string
-                                            (with-current-buffer (marker-buffer m)
-                                              (line-number-at-pos m t))))
-                          into lw
-                          finally return (cons (min 28 bw) lw))))
-      (with-current-buffer (marker-buffer val)
-        (save-excursion
-          (without-restriction
-            (goto-char val)
-            (let* ((line (line-number-at-pos))
-                   (bn (buffer-name))
-                   (name (if (> (length bn) buf-width)
-                             (concat "…" (substring bn (- (1- buf-width)))) bn))
-                   (str (propertize (string-trim-left
-                                     (consult--buffer-substring (pos-bol) (pos-eol) 'fontify))
-                                    'consult-location (cons val line)))
-                   (loc (concat (propertize name 'face 'consult-file)
-                                (propertize ":" 'face 'shadow)
-                                (propertize (number-to-string line) 'face 'consult-line-number))))
-              (list (concat (string-pad loc (+ buf-width 1 line-width))
-                            (propertize " │ " 'face 'shadow) str)
-                    'multi-category `(consult-location . ,str)
-                    'consult--type ?p)))))))
-
-  (defun adh--consult-register-format (reg &optional completion)
-    "Like `consult-register-format' but render the key as a bracketed [KEY]."
-    (pcase-let* ((`(,key . ,val) reg)
-                 (key-str (concat (propertize "[" 'face 'shadow)
-                                  (propertize (single-key-description key)
-                                              'face 'consult-highlight-match)
-                                  (propertize "]" 'face 'shadow)))
-                 (key-len (max 3 (length key-str)))
-                 (`(,str . ,props) (consult-register--describe val)))
-      (when (string-search "\n" str)
-        (let* ((lines (seq-take (seq-remove #'string-blank-p (split-string str "\n")) 3))
-               (space (cl-loop for x in lines minimize (string-match-p "[^ ]" x))))
-          (setq str (mapconcat (lambda (x) (substring x space))
-                               lines (concat "\n" (make-string (1+ key-len) ?\s))))))
-      (setq str (concat
-                 (and completion consult-register-prefix)
-                 key-str (make-string (- key-len (length key-str)) ?\s) " "
-                 str (and (not completion) "\n")))
-      (when completion
-        (add-text-properties 0 (length str) `(consult--candidate ,(car reg) ,@props) str))
-      str))
-  (advice-add #'consult-register-format :override #'adh--consult-register-format))
-
-(defun adh--consult-fd-with-region (&optional i)
-  "Run `consult-fd' under directory I, seeded with the active region if any."
-  (if (use-region-p)
-      (consult-fd i (buffer-substring-no-properties (region-beginning) (region-end)))
-    (consult-fd i)))
-
-(defun adh--consult-fd-directories (&optional arg)
-  "Run `consult-fd' under ARG, restricted to directories."
-  (require 'consult)
-  (let ((consult-fd-args (concat adh--consult-fd-args " -t directory --prune")))
-    (consult-fd arg)))
-
-(defun adh--consult-ripgrep-with-region (&optional i)
-  "Run `consult-ripgrep' under directory I, seeded with the active region if any."
-  (if (use-region-p)
-      (consult-ripgrep i (buffer-substring-no-properties (region-beginning) (region-end)))
-    (consult-ripgrep i)))
-
-(defun adh-consult-fd-here ()
-  "Find files below `default-directory'."
-  (interactive)
-  (adh--consult-fd-with-region default-directory))
-
-(defun adh-consult-fd-directories-here ()
-  "Find directories below `default-directory'."
-  (interactive)
-  (adh--consult-fd-directories default-directory))
-
-(defun adh-consult-fd-dirs (&optional initial)
-  "Find files in several directories, read as a comma-separated list.
-INITIAL is the initial search input."
-  (interactive)
-  (consult-fd '(4) initial))
-
-(defun adh-consult-ripgrep-dirs (&optional initial)
-  "Grep in several directories, read as a comma-separated list.
-INITIAL is the initial search input."
-  (interactive)
-  (consult-ripgrep '(4) initial))
-
-(defun adh-consult-dirs-pivot ()
-  "Rerun the current fd or ripgrep search in chosen directories, keeping the input."
-  (interactive)
-  (let ((input (minibuffer-contents-no-properties))
-        (command (pcase (minibuffer-prompt)
-                   ((rx bos "Fd") #'adh-consult-fd-dirs)
-                   ((rx bos "Ripgrep") #'adh-consult-ripgrep-dirs)
-                   (_ (user-error "Not in a consult fd or ripgrep search")))))
-    (run-with-idle-timer adh--minibuffer-pivot-delay nil command input)
-    (abort-recursive-edit)))
-
-(defun adh-consult-ripgrep-here ()
-  "Grep below `default-directory'."
-  (interactive)
-  (adh--consult-ripgrep-with-region default-directory))
-
-(defun adh-consult-fd-project ()
-  "Find files in the current project."
-  (interactive)
-  (adh--consult-fd-with-region (adh--get-project-dir)))
-
-(defun adh-consult-fd-directories-project ()
-  "Find directories in the current project."
-  (interactive)
-  (adh--consult-fd-directories (adh--get-project-dir)))
-
-(defun adh-consult-ripgrep-project ()
-  "Grep the current project."
-  (interactive)
-  (adh--consult-ripgrep-with-region (adh--get-project-dir)))
-
-(defun adh-consult-line-with-region ()
-  "Search lines in the buffer, seeded with the active region, with live preview."
-  (interactive)
-  (require 'consult)
-  (let ((consult-preview-key 'any))
-    (if (use-region-p)
-        (let ((input (buffer-substring-no-properties (region-beginning) (region-end))))
-          (deactivate-mark)
-          (consult-line input))
-      (consult-line))))
-
-(defun adh-consult-locate (&optional initial)
-  "Locate files by name, seeded with the active region or INITIAL."
-  (interactive)
-  (if (use-region-p)
-      (consult-locate (buffer-substring-no-properties (region-beginning) (region-end)))
-    (consult-locate initial)))
-
-(defun adh-consult-select-window ()
-  "Select another window, prompting by buffer name when several are eligible."
-  (interactive)
-  (require 'consult)
-  (let* ((all-wins (cdr (window-list)))
-         (wins (seq-remove (lambda (w)
-                             (window-parameter w 'no-other-window))
-                           all-wins)))
-    (cond
-     ((= (length wins) 0)
-      (call-interactively #'other-window))
-     ((= (length wins) 1)
-      (select-window (car wins)))
-     (t
-      (let* ((cands (mapcar (lambda (w)
-                              (cons (buffer-name (window-buffer w)) w))
-                            wins))
-             (choice (consult--read (mapcar #'car cands)
-                                    :prompt "Window: "
-                                    :require-match t
-                                    :sort nil)))
-        (when choice
-          (select-window (cdr (assoc choice cands)))))))))
-
-(defun adh-jump-to-register ()
-  "Jump to a register, then recenter."
-  (interactive)
-  (call-interactively #'jump-to-register)
-  (recenter))
-
-(defun adh-consult-flymake-show-buffer-diagnostics ()
-  "Quit `consult-flymake' and list the source buffer's Flymake diagnostics instead."
-  (interactive)
-  (let ((buf (window-buffer (minibuffer-selected-window))))
-    (run-at-time 0 nil (lambda () (with-current-buffer buf (flymake-show-buffer-diagnostics))))
-    (minibuffer-quit-recursive-edit)))
+(defvar crm-prompt)
+(defvar consult--regexp-compiler)
+(defvar adh--imenu-items nil
+  "Items that the last consult-imenu prompt offered.")
 
 (defvar-keymap adh-consult-flymake-map)
 
@@ -190,20 +15,240 @@ INITIAL is the initial search input."
     ((pred integerp) (copy-marker pos))
     (`(,p . ,_) (adh--imenu-marker p))))
 
+(defun adh--read-dirs (&optional start)
+  "Read comma-separated directories, prefilled with START."
+  (let ((crm-prompt "%p")
+        (def (abbreviate-file-name (or start default-directory)))
+        (minibuffer-completing-file-name t))
+    (completing-read-multiple "Run in: " #'completion-file-name-table
+                              #'directory-name-p t def 'consult--path-history def)))
+
+(defun adh--consult-with-region (command dir)
+  "Run consult COMMAND under DIR, seeded with the region."
+  (let ((adh--command-origin-dir default-directory))
+    (funcall command dir (and (use-region-p)
+                              (replace-regexp-in-string
+                               (rx (group (or bos " ")) "-") "\\1\\\\-"
+                               (string-replace
+                                " " "\\ "
+                                (adh--pcre-quote
+                                 (buffer-substring-no-properties (region-beginning) (region-end)))))))))
+
+(defun adh-consult-fd-dirs (&optional initial start)
+  "Find files in comma-separated directories; INITIAL seeds the input.
+START prefills the directory prompt."
+  (interactive)
+  (let ((adh--command-origin-dir (or start default-directory)))
+    (consult-fd (adh--read-dirs start) initial)))
+
+(defun adh-consult-ripgrep-dirs (&optional initial start)
+  "Grep in comma-separated directories; INITIAL seeds the input.
+START prefills the directory prompt."
+  (interactive)
+  (let ((adh--command-origin-dir (or start default-directory)))
+    (consult-ripgrep (adh--read-dirs start) initial)))
+
+(defun adh-consult-fd-here ()
+  "Find files below `default-directory'."
+  (interactive)
+  (adh--consult-with-region #'consult-fd default-directory))
+
+(defun adh-consult-ripgrep-here ()
+  "Grep below `default-directory'."
+  (interactive)
+  (adh--consult-with-region #'consult-ripgrep default-directory))
+
+(defun adh-consult-fd-project ()
+  "Find files in the current project."
+  (interactive)
+  (adh--consult-with-region #'consult-fd (adh--get-project-dir)))
+
+(defun adh-consult-ripgrep-project ()
+  "Grep the current project."
+  (interactive)
+  (adh--consult-with-region #'consult-ripgrep (adh--get-project-dir)))
+
+(defun adh-consult-dirs-pivot ()
+  "Rerun the current fd or ripgrep search in other directories."
+  (interactive)
+  (let ((input (minibuffer-contents-no-properties))
+        (start (adh--origin-dir))
+        (command (pcase (minibuffer-prompt)
+                   ((rx bos "Fd") #'adh-consult-fd-dirs)
+                   ((rx bos "Ripgrep") #'adh-consult-ripgrep-dirs)
+                   (_ (user-error "Not in a consult fd or ripgrep search")))))
+    (adh--minibuffer-pivot-call
+     (lambda ()
+       (let ((default-directory start))
+         (funcall command input start))))))
+
+(defun adh-consult-root-pivot ()
+  "Rerun the current fd or ripgrep search at the project root.
+When it already runs there, rerun it in the directory it started from."
+  (interactive)
+  (let* ((input (minibuffer-contents-no-properties))
+         (origin (adh--origin-dir))
+         (root (adh--get-project-dir origin))
+         (dir (if (and root (not (file-equal-p default-directory root))) root origin))
+         (command (pcase (minibuffer-prompt)
+                    ((rx bos "Fd") #'consult-fd)
+                    ((rx bos "Ripgrep") #'consult-ripgrep)
+                    (_ (user-error "Not in a consult fd or ripgrep search")))))
+    (when (file-equal-p dir default-directory)
+      (user-error (if root "Already at the project root" "Not in a project")))
+    (adh--minibuffer-pivot-call
+     (lambda ()
+       (let ((adh--command-origin-dir origin))
+         (funcall command dir input))))))
+
+(defun adh-consult-locate (&optional initial)
+  "Locate files by name, seeded with the active region or INITIAL."
+  (interactive)
+  (consult-locate (if (use-region-p)
+                      (buffer-substring-no-properties (region-beginning) (region-end))
+                    initial)))
+
+(defun adh-consult-flymake-show-buffer-diagnostics ()
+  "Quit `consult-flymake' and list the buffer's Flymake diagnostics."
+  (interactive)
+  (let ((buf (window-buffer (minibuffer-selected-window))))
+    (run-at-time 0 nil (lambda () (with-current-buffer buf (flymake-show-buffer-diagnostics))))
+    (minibuffer-quit-recursive-edit)))
+
+(defun adh--imenu-remember-items (_prompt items)
+  "Advice: keep the ITEMS a consult-imenu prompt offers, for the export."
+  (setq adh--imenu-items items))
+
 (defun adh-embark-export-imenu (names)
-  "Export imenu candidates NAMES to an occur buffer linking to their definitions."
-  (let ((items (if (minibufferp)
-                   (with-minibuffer-selected-window (consult-imenu--items))
-                 (consult-imenu--items))))
+  "Export the definition lines of imenu NAMES to an occur buffer."
+  (let ((items (cond ((memq (bound-and-true-p embark--command) '(consult-imenu consult-imenu-multi))
+                      adh--imenu-items)
+                     ((minibufferp) (with-minibuffer-selected-window (consult-imenu--items)))
+                     (t (consult-imenu--items))))
+        seen)
     (embark-consult-export-location-occur
      (delq nil
            (mapcar (lambda (name)
                      (when-let* ((marker (adh--imenu-marker (cdr (assoc name items)))))
-                       (propertize name 'consult-location
-                                   (cons marker
-                                         (with-current-buffer (marker-buffer marker)
-                                           (line-number-at-pos marker t))))))
+                       (with-current-buffer (marker-buffer marker)
+                         (save-restriction
+                           (widen)
+                           (save-excursion
+                             (goto-char marker)
+                             (let ((line (cons (current-buffer) (line-number-at-pos))))
+                               (unless (member line seen)
+                                 (push line seen)
+                                 (propertize (buffer-substring (pos-bol) (pos-eol))
+                                             'consult-location (cons marker (cdr line))))))))))
                    names)))))
+
+(defvar adh--grep-lookahead-cache (make-hash-table :test #'equal)
+  "Results of `consult--grep-lookahead-p', per host and command.")
+
+(defun adh--consult-cache-lookahead (fn &rest cmd)
+  "Advice: run the look-ahead check FN on CMD once per host and command."
+  (car (with-memoization (gethash (cons (file-remote-p default-directory) cmd)
+                                  adh--grep-lookahead-cache)
+         (list (apply fn cmd)))))
+
+(defun adh--consult-scope (word origin files)
+  "Return (PATH BEG END) for each path the ./ or ../ WORD names from ORIGIN."
+  (let* ((full (expand-file-name word origin))
+         (parent (file-name-directory full))
+         (part (file-name-nondirectory (directory-file-name word)))
+         (len (if (member part '("." "..")) 0 (length part))))
+    (mapcar (lambda (path)
+              (let* ((path (file-relative-name path))
+                     (beg (length (file-name-directory (directory-file-name path)))))
+                (list path beg (+ beg len))))
+            (cond ((file-directory-p full) (list (file-name-as-directory full)))
+                  ((and files (file-exists-p full)) (list full))
+                  ((and (file-directory-p parent)
+                        (mapcar (lambda (f) (expand-file-name f parent))
+                                (let ((case-fold-search nil))
+                                  (completion-pcm--filename-try-filter
+                                   (seq-filter (if files #'always #'directory-name-p)
+                                               (file-name-all-completions
+                                                (file-name-nondirectory full) parent)))))))
+                  (t (list full))))))
+
+(defun adh--pcre-to-emacs-regexp (re)
+  "Approximate PCRE RE in Emacs syntax for highlighting, dropping lookarounds."
+  (replace-regexp-in-string
+   (rx (or (seq "\\" anything)
+           (seq "[" (? "^") (? "]") (* (or (seq "\\" anything) (not (any "]\\")))) "]")
+           "(?:" (any "(){}|")))
+   (lambda (m)
+     (pcase m
+       ((pred (string-prefix-p "["))
+        (string-replace "\\d" "[:digit:]" (string-replace "\\s" "[:space:]" (string-replace "\\w" "[:word:]" m))))
+       ((or "(" "(?:") "\\(?:")
+       ((or ")" "{" "}" "|") (concat "\\" m))
+       ((or "\\(" "\\)" "\\{" "\\}" "\\|") (substring m 1))
+       ("\\d" "[0-9]") ("\\D" "[^0-9]") ("\\s" "[[:space:]]") ("\\S" "[^[:space:]]")
+       (_ m)))
+   (replace-regexp-in-string
+    (rx "(?" (or (seq (? "<") (any "=!") (* (or (seq "\\" anything) (not (any "()\\")))) ")")
+                 (seq (+ (any "a-z")) ")")))
+    ""
+    (replace-regexp-in-string (rx "(?" (? "P") "<" (+ (any word "_")) ">") "(" re))
+   t t))
+
+(defun adh--consult-pcre-compiler (input _type ignore-case)
+  "Pass the words of INPUT to the tool as PCRE, highlighting an approximation."
+  (let ((regexps (consult--split-escaped input)))
+    (cons (if (cdr regexps) (mapcar (lambda (r) (concat "(?:" r ")")) regexps) regexps)
+          (when-let* ((hl (seq-filter #'consult--valid-regexp-p
+                                      (mapcar #'adh--pcre-to-emacs-regexp regexps))))
+            (apply-partially #'consult--highlight-regexps hl ignore-case)))))
+
+(defun adh--consult-scoped-builder (make-builder paths files)
+  "Builder from MAKE-BUILDER where input words like ./ or ../x set the PATHS."
+  (let ((origin (adh--origin-dir))
+        (builder (funcall make-builder paths))
+        cache)
+    (lambda (input)
+      (let* ((consult--regexp-compiler #'adh--consult-pcre-compiler)
+             (words (split-string (string-replace "\\ " "\0" input) " "))
+             (rel (seq-filter (lambda (w) (string-match-p "\\`\\.\\.?/" w)) words))
+             (rest (string-replace "\0" "\\ " (string-join (seq-difference words rel) " "))))
+        (if (not rel)
+            (funcall builder input)
+          (condition-case err
+              (let* ((spans (mapcan (lambda (w) (adh--consult-scope (string-replace "\0" " " w) origin files))
+                                    rel))
+                     (dirs (mapcar #'car spans)))
+                (unless (equal (car cache) dirs)
+                  (setq cache (cons dirs (funcall make-builder dirs))))
+                (let ((res (funcall (cdr cache) rest)))
+                  (if (or files (not (consp res)))
+                      res
+                    (let ((hl (cdr res)))
+                      (cons (car res)
+                            (lambda (str)
+                              (when hl (funcall hl str))
+                              (pcase-dolist (`(,d ,beg ,end) spans)
+                                (when (string-prefix-p d str)
+                                  (add-face-text-property beg end 'consult-highlight-match nil str)))
+                              str))))))
+            (error
+             (message "[adh] ./ search scope failed: %s" (error-message-string err))
+             (funcall builder rest))))))))
+
+(defun adh--consult-fd-scoped (make-builder paths)
+  "Advice: `adh--consult-scoped-builder' for fd, defaulting to -t file."
+  (let ((builder (adh--consult-scoped-builder make-builder paths nil)))
+    (lambda (input)
+      (let ((res (funcall builder input)))
+        (when (and (consp (car-safe res))
+                   (not (seq-some (lambda (opt) (string-match-p "\\`\\(-t\\|--type\\)" opt))
+                                  (cdr (consult--command-split input)))))
+          (setcar res (cons (caar res) (append '("-t" "file") (cdar res)))))
+        res))))
+
+(defun adh--consult-ripgrep-scoped (make-builder paths)
+  "Advice: `adh--consult-scoped-builder' for ripgrep, which also takes files."
+  (adh--consult-scoped-builder make-builder paths t))
 
 (use-package consult
   :ensure t :defer t
@@ -214,7 +259,7 @@ INITIAL is the initial search input."
   :custom
   (consult-buffer-filter '("\\` " "\\`\\*"))
   (consult-narrow-key "C-,")
-  (consult-preview-key "C-SPC")
+  (consult-preview-key "M-SPC")
   (consult-line-start-from-top t)
   :config
   (plist-put consult-source-buffer :items
@@ -222,36 +267,41 @@ INITIAL is the initial search input."
                          :sort 'visibility
                          :predicate #'adh--buffer-listable-p
                          :as #'consult--buffer-pair)))
-  (defconst adh--fd-executable-path (locate-user-emacs-file (concat "opt/fd/bin/fd" (when (eq system-type 'windows-nt) ".exe"))))
-  (defconst adh--consult-fd-args  (concat adh--fd-executable-path " --sort-by-depth --full-path --hidden --no-ignore --color=never --exclude .git --path-separator=/"))
+
   (defvar adh--consult-ripgrep-args-base consult-ripgrep-args)
 
-  (setq consult-fd-args (concat adh--consult-fd-args " -t file"))
-  (setq consult-ripgrep-args (concat adh--consult-ripgrep-args-base " -P --hidden --no-ignore -g !TAGS -g !*.{git,zip,tar,gz,tgz,bz2,tbz2,xz,txz,zst,tzst,7z,rar,lz4,lzma,Z,jar,war}"))
+  (setq consult-fd-args '(adh--fd-program "--sort-by-depth --hidden --no-ignore --prune --color=never --exclude .git --path-separator=/"))
+  (setq consult-ripgrep-args (concat adh--consult-ripgrep-args-base " --hidden --no-ignore -g !TAGS -g !*.{git,zip,tar,gz,tgz,bz2,tbz2,xz,txz,zst,tzst,7z,rar,lz4,lzma,Z,jar,war}"))
+
+  (advice-add 'consult--fd-make-builder :around #'adh--consult-fd-scoped)
+  (advice-add 'consult--ripgrep-make-builder :around #'adh--consult-ripgrep-scoped)
+  (advice-add 'consult--grep-lookahead-p :around #'adh--consult-cache-lookahead)
+  (advice-add 'consult-imenu--select :before #'adh--imenu-remember-items)
 
   (pcase system-type
     ('windows-nt
      (adh-add-to-path "C:/Program Files/Everything")
      (setq consult-locate-args "es.exe -s -full-path-and-name"))
+    ('darwin
+     (setq consult-locate-args "locate -i"))
     (_
      (setq consult-locate-args "locate -i -r")))
 
   (consult-customize consult-flymake :keymap adh-consult-flymake-map)
-  (consult-customize consult-imenu consult-goto-line :preview-key 'any))
+  (consult-customize consult-imenu consult-goto-line :preview-key 'any)
+  (consult-customize consult-imenu-multi consult-goto-line :preview-key 'any))
 
 (use-package embark
-  :ensure t
+  :ensure t :defer t
   :custom
   (embark-indicators
    '(embark-minimal-indicator
      embark-highlight-indicator
      embark-isearch-highlight-indicator))
-  (embark-prompter 'embark-keymap-prompter)
   :hook
-  ;; Give exported buffers a short "*e: MODE: QUERY*" name and dock them at the bottom.
   (embark-after-export . (lambda ()
                            (let ((bn (buffer-name)))
-                             (when (string-match "\\*Embark Export: .* - \\(.*\\)\\*" bn)
+                             (when (string-match "\\*Embark Export: .*? - \\(.*\\)\\*" bn)
                                (let ((search-input (match-string 1 bn)))
                                  (rename-buffer (format "*e: %s: %s" (replace-regexp-in-string "-mode$" "" (symbol-name major-mode)) search-input) t)))))))
 

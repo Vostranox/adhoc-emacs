@@ -1,5 +1,7 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(require 'adh-functions)
+
 (defvar adh--ml-bg       "#181818")
 (defvar adh--ml-isle     "#1f1f1f")
 (defvar adh--ml-pill     "#282828")
@@ -37,90 +39,60 @@
                      '(1 3 5)))
     a))
 
-(defun adh--ml-sync-palette (&rest _)
+(defun adh--ml-sync-palette ()
   "Point the mode line colours at the active gruber palette."
-  (let ((palette (or (and (boundp 'gruber-material-dark--palette-intense)
-                          (symbol-value 'gruber-material-dark--palette-intense))
-                     (and (boundp 'gruber-material-dark--palette)
-                          (symbol-value 'gruber-material-dark--palette)))))
-    (when palette
-      (dolist (pair adh--ml-palette-map)
-        (when-let* ((hex (cdr (assq (cdr pair) palette))))
-          (set (car pair) hex)))))
+  (when-let* ((palette (if (eq (car custom-enabled-themes) 'gruber-material-dark)
+                           (bound-and-true-p gruber-material-dark--palette)
+                         (bound-and-true-p gruber-material-dark--palette-intense))))
+    (dolist (pair adh--ml-palette-map)
+      (when-let* ((hex (cdr (assq (cdr pair) palette))))
+        (set (car pair) hex))))
   (setq adh--ml-strong (adh--ml-mix adh--ml-pill adh--ml-faint))
   (setq adh--ml-inactive (adh--ml-mix adh--ml-bg3 adh--ml-muted)))
 
 (defconst adh--ml-cap-l "")
 (defconst adh--ml-cap-r "")
 
-(defconst adh--segment-modal-state-alist
-  '((normal . ("N" . font-lock-function-name-face))
-    (insert . ("I" . warning))
-    (motion . ("M" . homoglyph))))
+(defconst adh--ml-modal-states
+  '((normal "N" . font-lock-function-name-face)
+    (insert "I" . warning)
+    (motion "M" . homoglyph)))
+
+(defun adh--ml-translucent-p ()
+  "Return non-nil if this frame's background is see-through."
+  (let ((alpha (frame-parameter nil 'alpha-background)))
+    (and (numberp alpha) (< alpha (if (floatp alpha) 1.0 100)))))
 
 (defun adh--ml-cap (glyph fg bg)
   "Render cap GLYPH in color FG against background BG."
-  (propertize glyph 'face `(:foreground ,fg :background ,bg)))
+  (if (adh--ml-translucent-p)
+      (propertize " " 'face `(:background ,fg) 'adh--ml-cap t)
+    (propertize glyph 'face `(:foreground ,fg :background ,bg) 'adh--ml-cap t)))
 
-(defun adh--ml-fresh (part)
-  "Return PART as a string that is safe to modify."
-  (if (stringp part) (copy-sequence part) (format-mode-line part)))
-
-(defun adh--ml-tint (part color)
-  "Render PART in COLOR, keeping any faces it already carries."
-  (let ((s (adh--ml-fresh part)))
-    (unless (string-empty-p s)
-      (add-face-text-property 0 (length s) `(:foreground ,color) t s))
-    s))
-
-(defun adh--ml-force (part color)
-  "Render PART in COLOR, overriding any foreground it already carries."
-  (let ((s (adh--ml-fresh part)))
-    (unless (string-empty-p s)
-      (add-face-text-property 0 (length s) `(:foreground ,color) nil s))
+(defun adh--ml-tint (part color &optional override)
+  "Render PART in COLOR, under the faces it carries unless OVERRIDE."
+  (let ((s (copy-sequence part)))
+    (add-face-text-property 0 (length s) `(:foreground ,color) (not override) s)
     s))
 
 (defun adh--ml-escape (str)
   "Double every %% in STR so the mode line renders it literally."
-  (if (string-search "%" str)
-      (replace-regexp-in-string "%" "%%" str t t)
-    str))
+  (string-replace "%" "%%" str))
 
 (defun adh--ml-literal (construct)
   "Render CONSTRUCT for display, keeping any %% it contains literal."
-  (let ((lit (cond ((stringp construct) construct)
-                   ((and (symbolp construct) (boundp construct)
-                         (stringp (symbol-value construct)))
-                    (symbol-value construct)))))
-    (adh--ml-escape (or lit (format-mode-line construct)))))
-
-(defun adh--ml-dim (part)
-  "Render PART in the secondary text color."
-  (adh--ml-tint part adh--ml-muted))
-
-(defun adh--ml-on-isle (part)
-  "Give PART the island background, keeping any faces it already carries."
-  (let ((s (adh--ml-fresh part)))
-    (unless (string-empty-p s)
-      (add-face-text-property 0 (length s) `(:background ,adh--ml-isle) t s))
-    s))
+  (adh--ml-escape (if (stringp construct) construct (format-mode-line construct))))
 
 (defun adh--ml-island (&rest parts)
   "Join PARTS, drop nils, and wrap the result in a rounded island."
-  (let ((body (mapconcat #'adh--ml-on-isle (delq nil parts) "")))
+  (let ((body (apply #'concat parts)))
     (when (string-match-p "[^ \t\n\r]" body)
+      (unless (get-text-property (1- (length body)) 'adh--ml-cap body)
+        (setq body (concat body " ")))
+      (add-face-text-property 0 (length body) `(:background ,adh--ml-isle) t body)
       (concat (adh--ml-cap adh--ml-cap-l adh--ml-isle adh--ml-bg)
               body
-              (if (string-suffix-p adh--ml-cap-r body) "" (adh--ml-on-isle " "))
               (adh--ml-cap adh--ml-cap-r adh--ml-isle adh--ml-bg)))))
-
-(defun adh--ml-pill (text fg)
-  "Render TEXT as a bold pill in FG, capped against the island."
-  (concat (adh--ml-cap adh--ml-cap-l adh--ml-pill adh--ml-isle)
-          (propertize text 'face `(:foreground ,fg
-                                   :background ,adh--ml-pill
-                                   :weight bold))
-          (adh--ml-cap adh--ml-cap-r adh--ml-pill adh--ml-isle)))
 
 (defun adh--ml-box (bg parts)
   "Join non-nil PARTS and wrap them in a rounded box of background BG."
@@ -145,36 +117,32 @@
   "Face for the buffer name in mode lines of unselected windows."
   :group 'mode-line-faces)
 
-(declare-function project-current "project" (&optional maybe-prompt directory))
 (declare-function project-root "project" (project))
-(declare-function adh--get-project-dir "adh-project" (&optional dir))
 
-(defvar-local adh--ml-project-root 'unset
-  "This buffer's project root as a directory, nil for none, `unset' if unasked.")
+(defvar-local adh--ml-project-roots nil
+  "Alist of the directories looked up in this buffer and their project roots.")
 
-(defun adh--ml-note-project (&optional allow-remote)
-  "Resolve and cache this buffer's project root."
-  (setq adh--ml-project-root
-        (and default-directory
-             (or allow-remote (not (file-remote-p default-directory)))
-             (cond ((fboundp 'adh--get-project-dir)
-                    (adh--get-project-dir))
-                   ((fboundp 'project-current)
-                    (when-let* ((proj (project-current nil)))
-                      (project-root proj)))))))
+(defun adh--ml-note-project ()
+  "Resolve and cache the project root of `default-directory'."
+  (setf (alist-get default-directory adh--ml-project-roots nil nil #'equal)
+        (adh--get-project-dir)))
 
-(defun adh--ml-note-project-eagerly ()
-  "Resolve the project root on `find-file-hook', remote included."
-  (adh--ml-note-project t))
+(defun adh--ml-project-root ()
+  "Return the project root of `default-directory', resolving it when local."
+  (if-let* ((hit (assoc default-directory adh--ml-project-roots)))
+      (cdr hit)
+    (and default-directory
+         (not (file-remote-p default-directory))
+         (adh--ml-note-project))))
 
-(add-hook 'find-file-hook #'adh--ml-note-project-eagerly)
+(add-hook 'find-file-hook #'adh--ml-note-project)
 
 (defun adh--ml-visit-project-root (event)
   "Open the project root of the buffer whose mode line was clicked."
   (interactive "e")
   (with-selected-window (posn-window (event-start event))
-    (when (stringp adh--ml-project-root)
-      (find-file adh--ml-project-root))))
+    (when-let* ((root (adh--ml-project-root)))
+      (find-file root))))
 
 (defvar adh--ml-project-map
   (let ((m (make-sparse-keymap)))
@@ -184,24 +152,32 @@
 
 (defun adh--segment-project ()
   "Return the project's directory name, clickable to jump to its root."
-  (when (eq adh--ml-project-root 'unset)
-    (adh--ml-note-project))
-  (when (stringp adh--ml-project-root)
+  (when-let* ((root (adh--ml-project-root)))
     (propertize (adh--ml-escape
-                 (file-name-nondirectory
-                  (directory-file-name adh--ml-project-root)))
+                 (file-name-nondirectory (directory-file-name root)))
                 'face `(:foreground ,adh--ml-accent)
                 'mouse-face 'mode-line-highlight
-                'help-echo (concat adh--ml-project-root
-                                   "\nmouse-1: open project root")
+                'help-echo (concat root "\nmouse-1: open project root")
                 'local-map adh--ml-project-map)))
 
+(defun adh--ml-dired-p ()
+  "Return non-nil in a Dired buffer that lists a directory."
+  (and (derived-mode-p '(dired-mode wdired-mode)) (not (bound-and-true-p dirvish-fd-buffer))))
+
+(defun adh--ml-dired-name ()
+  "Return the name of the directory a Dired buffer lists, ending in a slash."
+  (let* ((dir (abbreviate-file-name (file-local-name default-directory)))
+         (name (file-name-nondirectory (directory-file-name dir))))
+    (if (equal name "") dir (file-name-as-directory name))))
+
 (defun adh--segment-file ()
-  "Return the buffer name, carrying whether it can be, or has been, edited."
-  (let ((active (mode-line-window-selected-p)))
+  "Return the buffer name, carrying whether it can be, or has been, edited.
+A Dired buffer shows the name of its directory instead."
+  (let ((active (mode-line-window-selected-p))
+        (dired (adh--ml-dired-p)))
     (propertize
      (concat
-      (propertize (adh--ml-escape (buffer-name))
+      (propertize (adh--ml-escape (if dired (adh--ml-dired-name) (buffer-name)))
                   'face (if active
                             `(:foreground ,adh--ml-accent
                               :weight bold
@@ -216,7 +192,7 @@
               (propertize "•" 'face face 'display '(raise 0.15))
             (propertize " " 'face face)))))
      'mouse-face 'mode-line-highlight
-     'help-echo (concat "Buffer name"
+     'help-echo (concat (if dired (abbreviate-file-name default-directory) "Buffer name")
                         (cond (buffer-read-only " (read-only)")
                               ((buffer-modified-p) " (modified)")
                               (t ""))
@@ -235,44 +211,22 @@
     m)
   "Keymap on the encoding segment.")
 
-(defun adh--segment-eol ()
-  "Return the line-ending style, but only when it is not unix."
-  (let ((eol (coding-system-eol-type buffer-file-coding-system)))
-    (when (memq eol '(1 2))
-      (propertize (if (eq eol 1) "crlf" "cr")
-                  'face `(:foreground ,adh--ml-fg)))))
-
-(defun adh--segment-coding ()
-  "Return the buffer's coding system, or nil when it has none."
-  (when buffer-file-coding-system
-    (let* ((sys (coding-system-plist buffer-file-coding-system))
-           (cat (plist-get sys :category))
-           (sym (if (memq cat '(coding-category-undecided coding-category-utf-8))
-                    'utf-8
-                  (plist-get sys :name))))
-      (propertize (adh--ml-escape (downcase (symbol-name sym)))
-                  'face `(:foreground ,adh--ml-fg)))))
-
 (defun adh--segment-encoding ()
-  "Return the coding system, with the line ending after a slash when unusual."
-  (let* ((coding (adh--segment-coding))
-         (eol (adh--segment-eol))
-         (body (cond ((and coding eol)
-                      (concat coding
-                              (propertize "/" 'face `(:foreground ,adh--ml-fg))
-                              eol))
-                     (coding)
-                     (eol))))
-    (when body
-      (let ((s (copy-sequence body)))
-        (add-text-properties
-         0 (length s)
-         (list 'mouse-face 'mode-line-highlight
-               'help-echo (format "Coding system: %s\nmouse-1: set coding system"
-                                  (or buffer-file-coding-system "none"))
-               'local-map adh--ml-encoding-map)
-         s)
-        s))))
+  "Return the coding system, plus the line ending when not unix."
+  (when buffer-file-coding-system
+    (let ((sys (coding-system-plist buffer-file-coding-system)))
+      (propertize (concat (if (memq (plist-get sys :category)
+                                    '(coding-category-undecided coding-category-utf-8))
+                              "utf-8"
+                            (symbol-name (plist-get sys :name)))
+                          (pcase (coding-system-eol-type buffer-file-coding-system)
+                            (1 "/crlf")
+                            (2 "/cr")))
+                  'face `(:foreground ,adh--ml-fg)
+                  'mouse-face 'mode-line-highlight
+                  'help-echo (format "Coding system: %s\nmouse-1: set coding system"
+                                     buffer-file-coding-system)
+                  'local-map adh--ml-encoding-map))))
 
 (defun adh--segment-remote ()
   "Return the remote indicator, or nil for a local file."
@@ -295,7 +249,7 @@
                                      (or method "?") host (or user "(default)"))))))
 
 (defun adh--segment-position ()
-  "Return row:col and how far the cursor is through the buffer, as a percentage."
+  "Return row:col and the position through the buffer in percent."
   (let* ((rowcol (format-mode-line '((line-number-mode "%l")
                                      (column-number-mode ":%c"))))
          (span (- (point-max) (point-min)))
@@ -304,18 +258,14 @@
                 (/ (* 100 (- (point) (point-min))) span))))
     (adh--ml-tint (concat rowcol " " (number-to-string pct) "%%") adh--ml-fg)))
 
-(defun adh--segment-modal-fn ()
-  "Return the current meow state as a faced N/I/M pill, or nil."
-  (when (boundp 'meow--current-state)
-    (let* ((mode-cons (alist-get meow--current-state
-                                 adh--segment-modal-state-alist))
-           (label (car-safe mode-cons))
-           (face (cdr-safe mode-cons)))
-      (when label
-        (propertize label
-                    'face `(:foreground ,(or (face-foreground face nil t)
-                                             adh--ml-fg)
-                            :weight bold))))))
+(defun adh--segment-modal ()
+  "Return the current meow state as a bold N/I/M letter, or nil."
+  (when-let* ((entry (alist-get (bound-and-true-p meow--current-state)
+                                adh--ml-modal-states)))
+    (propertize (car entry)
+                'face `(:foreground ,(or (face-foreground (cdr entry) nil t)
+                                         adh--ml-fg)
+                        :weight bold))))
 
 (defun adh--segment-major-mode ()
   "Return the major mode and its process."
@@ -323,49 +273,44 @@
          (proc (string-trim (adh--ml-literal mode-line-process)))
          (text (if (string-empty-p proc) name (concat name " " proc))))
     (unless (string-empty-p text)
-      (concat (format-mode-line "%[")
-              (adh--ml-tint text adh--ml-fg)
-              (let ((n (format-mode-line "%n")))
-                (if (string-empty-p n) "" (adh--ml-dim n)))
-              (format-mode-line "%]")))))
+      (concat "%[" (adh--ml-tint text adh--ml-fg) (adh--ml-tint "%n" adh--ml-muted) "%]"))))
+
+(defun adh--ml-select-tab (event)
+  "Switch to the tab whose name was clicked."
+  (interactive "e")
+  (when-let* ((obj (posn-string (event-start event)))
+              (n (get-text-property (cdr obj) 'adh--ml-tab (car obj))))
+    (with-selected-window (posn-window (event-start event))
+      (tab-bar-select-tab n))))
+
+(defvar adh--ml-tab-map
+  (let ((m (make-sparse-keymap)))
+    (define-key m [mode-line mouse-1] #'adh--ml-select-tab)
+    m)
+  "Keymap on each tab name.")
 
 (defun adh--segment-tab ()
   "Return a tab list when more than one tab exists, each clickable."
   (let ((tabs (tab-bar-tabs)))
     (when (> (length tabs) 1)
-      (let ((current-name (alist-get 'name (tab-bar--current-tab))))
-        (mapconcat
-         #'identity
-         (seq-map-indexed
-          (lambda (tab idx)
-            (let* ((raw (alist-get 'name tab))
-                   (name (adh--ml-escape raw))
-                   (n (1+ idx))
-                   (body (if (string= raw current-name)
-                             (adh--ml-mark
-                              (propertize name
-                                          'face `(:foreground ,adh--ml-fg)))
-                           (propertize name
-                                       'face `(:foreground ,adh--ml-muted))))
-                   (map (let ((m (make-sparse-keymap)))
-                          (define-key m [mode-line mouse-1]
-                                      (lambda (e)
-                                        (interactive "e")
-                                        (with-selected-window
-                                            (posn-window (event-start e))
-                                          (tab-bar-select-tab n))))
-                          m))
-                   (s (copy-sequence body)))
-              (add-text-properties
-               0 (length s)
-               (list 'mouse-face 'mode-line-highlight
-                     'help-echo (format "Tab %d: %s\nmouse-1: switch to this tab"
-                                        n raw)
-                     'local-map map)
-               s)
-              s))
-          tabs)
-         " ")))))
+      (mapconcat
+       #'identity
+       (seq-map-indexed
+        (lambda (tab idx)
+          (let* ((raw (alist-get 'name tab))
+                 (name (adh--ml-escape raw))
+                 (n (1+ idx)))
+            (propertize (if (eq (car tab) 'current-tab)
+                            (adh--ml-mark
+                             (propertize name 'face `(:foreground ,adh--ml-fg)))
+                          (propertize name 'face `(:foreground ,adh--ml-muted)))
+                        'mouse-face 'mode-line-highlight
+                        'help-echo (format "Tab %d: %s\nmouse-1: switch to this tab"
+                                           n raw)
+                        'adh--ml-tab n
+                        'local-map adh--ml-tab-map)))
+        tabs)
+       " "))))
 
 (defvar adh--ml-lsp-epoch 0
   "Bumped whenever eglot's set of servers may have changed.")
@@ -375,7 +320,7 @@
   (setq adh--ml-lsp-epoch (1+ adh--ml-lsp-epoch)))
 
 (with-eval-after-load 'eglot
-  (add-hook 'eglot-server-initialized-hook #'adh--ml-bump-lsp-epoch)
+  (add-hook 'eglot-connect-hook #'adh--ml-bump-lsp-epoch)
   (add-hook 'eglot-managed-mode-hook #'adh--ml-bump-lsp-epoch))
 
 (defun adh--ml-lsp-toggled (&rest _)
@@ -389,7 +334,7 @@
   "Cons of (EPOCH . STATE) for this buffer.")
 
 (defun adh--ml-lsp-server-covers-p ()
-  "Return non-nil when some running eglot server's project contains this file."
+  "Return non-nil if a running eglot server's project contains this file."
   (and (boundp 'eglot--servers-by-project)
        default-directory
        (not (file-remote-p default-directory))
@@ -417,38 +362,34 @@
                   'unmanaged)))))
   (cdr adh--ml-lsp-cache))
 
-(defun adh--ml-lsp-button (text color)
-  "Render TEXT in COLOR carrying eglot's own mode line menu."
-  (let ((s (adh--ml-force text color)))
-    (when (boundp 'eglot--main-menu-map)
-      (add-text-properties
-       0 (length s)
-       (list 'mouse-face 'mode-line-highlight
-             'help-echo "Eglot: Emacs LSP client\nmouse-1: Display minor mode menu"
-             'keymap (symbol-value 'eglot--main-menu-map))
-       s))
-    s))
+(defun adh--ml-lsp-button (color)
+  "Render \"lsp\" in COLOR carrying eglot's own mode line menu."
+  (propertize "lsp"
+              'face `(:foreground ,color)
+              'mouse-face 'mode-line-highlight
+              'help-echo "Eglot: Emacs LSP client\nmouse-1: Display minor mode menu"
+              'keymap (symbol-value 'eglot--main-menu-map)))
 
 (defun adh--segment-lsp ()
-  "Return the LSP indicator: white when this buffer is managed, dim otherwise."
+  "Return the LSP indicator, bright when this buffer is managed."
   (pcase (adh--ml-lsp-state)
     ('managed
-     (let ((extra (and (boundp 'eglot-mode-line-format)
-                       (delete "" (mapcar #'format-mode-line
-                                          (seq-difference
-                                           eglot-mode-line-format
-                                           '(eglot-mode-line-menu
-                                             eglot-mode-line-session)))))))
-       (concat (adh--ml-lsp-button "lsp" adh--ml-fg)
-               (when extra
-                 (let ((txt (adh--ml-escape
-                             (string-trim (mapconcat #'identity extra " ")))))
-                   (unless (string-empty-p txt)
-                     (concat " " (adh--ml-force txt adh--ml-fg))))))))
-    ('unmanaged (adh--ml-lsp-button "lsp" adh--ml-inactive))))
+     (let ((extra (adh--ml-escape
+                   (string-trim
+                    (mapconcat #'identity
+                               (delete "" (mapcar #'format-mode-line
+                                                  (seq-difference
+                                                   (symbol-value 'eglot-mode-line-format)
+                                                   '(eglot-mode-line-menu
+                                                     eglot-mode-line-session))))
+                               " ")))))
+       (concat (adh--ml-lsp-button adh--ml-fg)
+               (unless (string-empty-p extra)
+                 (concat " " (adh--ml-tint extra adh--ml-fg t))))))
+    ('unmanaged (adh--ml-lsp-button adh--ml-inactive))))
 
 (defconst adh--ml-minors-excluded
-  '(flymake-mode eglot--managed-mode
+  '(flymake-mode
     meow-normal-mode meow-insert-mode meow-motion-mode
     completion-preview-mode)
   "Minor modes that have a segment of their own, or none worth showing.")
@@ -460,9 +401,7 @@
       (let ((sym (car entry)))
         (when (and (not (memq sym adh--ml-minors-excluded))
                    (boundp sym) (symbol-value sym))
-          (let* ((tail (cdr entry))
-                 (lighter (if (consp tail) (car tail) tail))
-                 (s (string-trim (adh--ml-literal lighter))))
+          (let ((s (string-trim (adh--ml-literal (car-safe (cdr entry))))))
             (unless (string-empty-p s)
               (push (cons sym s) out))))))))
 
@@ -512,8 +451,8 @@
   "Keymap on each minor mode lighter.")
 
 (defun adh--segment-minor-modes ()
-  "Return the minor mode count, or dots and the lighters when expanded.
-The count or the dots toggle the list; a lighter opens its mode's menu."
+  "Return the minor mode count, or the lighters when expanded.
+The count toggles the list; a lighter opens its mode's menu."
   (let ((modes (adh--ml-active-minor-modes)))
     (when modes
       (let ((toggle (propertize
@@ -537,10 +476,9 @@ The count or the dots toggle the list; a lighter opens its mode's menu."
                    modes " ")))))))
 
 (defun adh--segment-flymake ()
-  "Return flymake's non-zero counters, or a quiet check when the buffer is clean."
-  (when (and (bound-and-true-p flymake-mode)
-             (boundp 'flymake-mode-line-format))
-    (let* ((s (format-mode-line (symbol-value 'flymake-mode-line-format)))
+  "Return flymake's non-zero counters, or a check mark when clean."
+  (when (bound-and-true-p flymake-mode)
+    (let* ((s (format-mode-line 'flymake-mode-line-counters))
            (n (length s))
            (i 0)
            all)
@@ -551,10 +489,7 @@ The count or the dots toggle the list; a lighter opens its mode's menu."
           (setq i next)))
       (setq all (nreverse all))
       (when all
-        (let ((nonzero (seq-remove
-                        (lambda (c)
-                          (equal (string-trim (substring-no-properties c)) "0"))
-                        all)))
+        (let ((nonzero (remove "0" all)))
           (if nonzero
               (mapconcat #'identity nonzero
                          (propertize "·" 'face `(:foreground ,adh--ml-faint)))
@@ -565,7 +500,7 @@ The count or the dots toggle the list; a lighter opens its mode's menu."
               tick)))))))
 
 (defun adh--segment-tooling ()
-  "LSP state and flymake's verdict as one reading, or nil when neither runs."
+  "Return the LSP state and flymake counters together, or nil."
   (let ((lsp (adh--segment-lsp))
         (fly (adh--segment-flymake)))
     (cond ((and lsp fly)
@@ -580,36 +515,27 @@ The count or the dots toggle the list; a lighter opens its mode's menu."
   (adh--ml-sub (adh--segment-major-mode) (adh--segment-minor-modes)))
 
 (defun adh--ml-right ()
-  "Build the right island: where the buffer came from and what the tooling says."
+  "Build the right island: tooling, remote, encoding and project."
   (when (mode-line-window-selected-p)
     (let ((parts (delq nil (list (adh--segment-tooling)
                                  (adh--segment-remote)
                                  (adh--segment-encoding)
                                  (adh--segment-project)))))
-      (when parts
-        (adh--ml-island " " (mapconcat #'identity parts "  "))))))
+      (adh--ml-island " " (mapconcat #'identity parts "  ")))))
 
 (defun adh--ml-left ()
   "Build the left island: what you are doing."
   (if (mode-line-window-selected-p)
       (adh--ml-island
        " "
-       (when-let* ((m (adh--segment-modal-fn))) (concat m "  "))
+       (when-let* ((m (adh--segment-modal))) (concat m "  "))
        (adh--ml-sub (adh--segment-file) (adh--segment-position))
        (when-let* ((modes (adh--segment-modes))) (concat "  " modes))
        (when-let* ((tabs (adh--segment-tab))) (concat "  " tabs)))
     (adh--ml-island " " (adh--segment-file))))
 
-(defun adh--ml-quiet-p ()
-  "Return non-nil while the minibuffer is taking input."
-  (and (active-minibuffer-window) t))
-
-(defun adh--ml-width (part)
-  "Return the columns PART occupies once the mode line collapses its escapes."
-  (string-width (format-mode-line part)))
-
 (defun adh--ml-compose ()
-  "Assemble the mode line: main island, transparent gap, right island if any."
+  "Assemble the mode line: left island, gap, right island."
   (let ((left  (adh--ml-left))
         (right (adh--ml-right)))
     (if (not right)
@@ -618,12 +544,12 @@ The count or the dots toggle the list; a lighter opens its mode's menu."
             (propertize " " 'display
                         `(space :align-to
                                 (- (+ right right-fringe right-margin)
-                                   ,(adh--ml-width right))))
+                                   ,(string-width (format-mode-line right)))))
             right))))
 
 (defun adh--ml-render ()
   "Render the mode line, quietened while the minibuffer is active."
-  (if (adh--ml-quiet-p)
+  (if (active-minibuffer-window)
       (let ((adh--ml-accent adh--ml-muted)
             (adh--ml-fg     adh--ml-muted)
             (adh--ml-warn   adh--ml-muted)
@@ -633,7 +559,7 @@ The count or the dots toggle the list; a lighter opens its mode's menu."
     (adh--ml-compose)))
 
 (defun adh--ml-minibuffer-refresh ()
-  "Force every mode line to redraw, for `adh--ml-quiet-p'."
+  "Force every mode line to redraw, for `adh--ml-render'."
   (force-mode-line-update t))
 
 (add-hook 'minibuffer-setup-hook #'adh--ml-minibuffer-refresh)
@@ -641,16 +567,15 @@ The count or the dots toggle the list; a lighter opens its mode's menu."
 
 (setq-default mode-line-format '("%e" (:eval (adh--ml-render))))
 
-(defun adh--ml-flatten-faces (&rest _)
+(defun adh--ml-flatten-faces ()
   "Make the mode line background match the frame and drop its border."
   (dolist (face '(mode-line mode-line-active mode-line-inactive))
-    (when (facep face)
-      (set-face-attribute face nil
-                          :box nil
-                          :overline nil
-                          :underline nil
-                          :background adh--ml-bg
-                          :foreground adh--ml-muted))))
+    (set-face-attribute face nil
+                        :box nil
+                        :overline nil
+                        :underline nil
+                        :background adh--ml-bg
+                        :foreground adh--ml-muted)))
 
 (defun adh--ml-refresh-theme (&rest _)
   "Re-read the palette, then re-flatten the mode line faces."

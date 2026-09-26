@@ -17,33 +17,43 @@ done
 EMACS_DIR="$HOME/.emacs.d"
 FD_DIR="$EMACS_DIR/opt/fd"
 
-pull_ff() {
-    git -C "$1" pull --ff-only || echo "[adh][warning] skipping update of '$1'" >&2
-}
-
-mkdir -p "$FD_DIR"
 if [[ -d "$FD_DIR/.git" ]]; then
-    pull_ff "$FD_DIR"
+    git -C "$FD_DIR" pull --ff-only || echo "[adh][warning] skipping update of '$FD_DIR'" >&2
 else
     git clone -b simple_sort_by_depth https://github.com/Vostranox/fd.git "$FD_DIR"
 fi
-
-pushd "$FD_DIR" >/dev/null
-cargo install --path . --force --locked --root "$FD_DIR"
-popd >/dev/null
+(cd "$FD_DIR" && cargo install --path . --force --locked --root "$FD_DIR")
 
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
     EMACS_DIR=$(cygpath -m "$EMACS_DIR")
 fi
 if [[ ! -d "$EMACS_DIR/elpa" ]]; then
     emacs --batch --eval "(progn
+        (load-file \"$EMACS_DIR/early-init.el\")
+        (setq gc-cons-threshold (* 64 1024 1024))
         (load-file \"$EMACS_DIR/init.el\")
-        (require 'treesit-auto)
-        (treesit-auto-install-all))"
+        (let ((user-init-file custom-file))
+          (package--save-selected-packages package-selected-packages))
+        (adh-treesit-ensure-grammars))"
 else
     emacs --batch --eval "(progn
+        (load \"$EMACS_DIR/lisp/adh-vars.el\")
+        (with-demoted-errors \"[adh][error] adh-custom-pre-init.el: %S\"
+          (load \"$EMACS_DIR/adh-custom-pre-init.el\" t))
         (require 'package)
         (add-to-list 'package-archives '(\"melpa\" . \"https://melpa.org/packages/\") t)
         (package-upgrade-all)
-        (package-vc-upgrade-all))"
+        (package-vc-upgrade-all)
+        (while (and vc-post-command-functions (seq-some #'process-command (process-list)))
+          (accept-process-output nil 0.1)))"
 fi
+
+emacs --batch --eval "(progn
+    (load-file \"$EMACS_DIR/early-init.el\")
+    (let ((proc (adh-compile-config)))
+      (while (process-live-p proc)
+        (accept-process-output proc 0.1))
+      (unless (zerop (process-exit-status proc))
+        (princ (with-current-buffer \" *adh-compile-config*\" (buffer-string))))
+      (kill-emacs (process-exit-status proc))))" ||
+    echo "[adh][warning] compiling lisp/ failed; Emacs will retry at startup" >&2
