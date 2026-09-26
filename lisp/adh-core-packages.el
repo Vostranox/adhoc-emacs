@@ -100,6 +100,7 @@
   (dired-recursive-deletes 'always)
   (dired-dwim-target t)
   (dired-kill-when-opening-new-dired-buffer t)
+  (dired-hide-details-hide-symlink-targets nil)
   (dired-listing-switches "-alh --group-directories-first --sort=version")
   :hook
   (dired-mode . (lambda ()

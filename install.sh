@@ -17,21 +17,9 @@ done
 EMACS_DIR="$HOME/.emacs.d"
 FD_DIR="$EMACS_DIR/opt/fd"
 THEMES_DIR="$EMACS_DIR/themes"
-SITE_LISP_DIR="$EMACS_DIR/site-lisp"
 
 pull_ff() {
     git -C "$1" pull --ff-only || echo "[adh][warning] skipping update of '$1'" >&2
-}
-
-clone_or_update() {
-    local url="$1"
-    local dir
-    dir="$SITE_LISP_DIR/$(basename "$url" .git)"
-    if [[ -d "$dir/.git" ]]; then
-        pull_ff "$dir"
-    else
-        git clone "$url" "$dir"
-    fi
 }
 
 mkdir -p "$THEMES_DIR"
@@ -52,10 +40,6 @@ pushd "$FD_DIR" >/dev/null
 cargo install --path . --force --locked --root "$FD_DIR"
 popd >/dev/null
 
-mkdir -p "$SITE_LISP_DIR"
-clone_or_update "https://github.com/Vostranox/slang-ts-mode.git"
-clone_or_update "https://github.com/Vostranox/hlsl-ts-mode.git"
-
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
     EMACS_DIR=$(cygpath -m "$EMACS_DIR")
 fi
@@ -68,5 +52,6 @@ else
     emacs --batch --eval "(progn
         (require 'package)
         (add-to-list 'package-archives '(\"melpa\" . \"https://melpa.org/packages/\") t)
-        (package-upgrade-all))"
+        (package-upgrade-all)
+        (package-vc-upgrade-all))"
 fi

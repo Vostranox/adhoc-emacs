@@ -62,13 +62,11 @@
           (c-ts-mode--get-indent-style mode))))))
 
 (use-package slang-ts-mode
-  :ensure nil
-  :load-path "site-lisp/slang-ts-mode"
+  :vc (:url "https://github.com/Vostranox/slang-ts-mode")
   :mode ("\\.slang\\'" "\\.slangh\\'"))
 
 (use-package hlsl-ts-mode
-  :ensure nil
-  :load-path "site-lisp/hlsl-ts-mode"
+  :vc (:url "https://github.com/Vostranox/hlsl-ts-mode")
   :mode ("\\.hlsl\\'" "\\.hlsli\\'"))
 
 (use-package clang-format :ensure t :defer t)

@@ -591,6 +591,16 @@ A numeric suffix is added as needed to avoid overwriting."
 
 (defalias 'adh-setenv #'setenv)
 
+(defun adh-upgrade-packages (&optional query)
+  "Upgrade all packages, including those installed with package-vc."
+  (interactive (list t))
+  (require 'package-vc)
+  (let ((vc-handled-backends (if (memq 'Git vc-handled-backends)
+                                 vc-handled-backends
+                               (cons 'Git vc-handled-backends))))
+    (package-upgrade-all query)
+    (package-vc-upgrade-all)))
+
 (defun adh-tmux-to-emacs-buffer ()
   "Capture the visible tmux pane into the *tmux* buffer."
   (interactive)
