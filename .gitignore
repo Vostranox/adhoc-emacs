@@ -9,7 +9,7 @@
 !lisp/**
 !examples/
 !examples/**
-!build-emacs/
-!build-emacs/**
+!scripts/
+!scripts/**
 
 *.elc

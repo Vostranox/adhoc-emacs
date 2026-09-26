@@ -62,23 +62,29 @@
   "Render cap GLYPH in color FG against background BG."
   (propertize glyph 'face `(:foreground ,fg :background ,bg)))
 
+(defun adh--ml-fresh (part)
+  "Return PART as a string that is safe to modify."
+  (if (stringp part) (copy-sequence part) (format-mode-line part)))
+
 (defun adh--ml-tint (part color)
   "Render PART in COLOR, keeping any faces it already carries."
-  (let ((s (copy-sequence (if (stringp part) part (format-mode-line part)))))
+  (let ((s (adh--ml-fresh part)))
     (unless (string-empty-p s)
       (add-face-text-property 0 (length s) `(:foreground ,color) t s))
     s))
 
 (defun adh--ml-force (part color)
   "Render PART in COLOR, overriding any foreground it already carries."
-  (let ((s (copy-sequence (if (stringp part) part (format-mode-line part)))))
+  (let ((s (adh--ml-fresh part)))
     (unless (string-empty-p s)
       (add-face-text-property 0 (length s) `(:foreground ,color) nil s))
     s))
 
 (defun adh--ml-escape (str)
   "Double every %% in STR so the mode line renders it literally."
-  (replace-regexp-in-string "%" "%%" str t t))
+  (if (string-search "%" str)
+      (replace-regexp-in-string "%" "%%" str t t)
+    str))
 
 (defun adh--ml-literal (construct)
   "Render CONSTRUCT for display, keeping any %% it contains literal."
@@ -94,7 +100,7 @@
 
 (defun adh--ml-on-isle (part)
   "Give PART the island background, keeping any faces it already carries."
-  (let ((s (copy-sequence (if (stringp part) part (format-mode-line part)))))
+  (let ((s (adh--ml-fresh part)))
     (unless (string-empty-p s)
       (add-face-text-property 0 (length s) `(:background ,adh--ml-isle) t s))
     s))
@@ -102,7 +108,7 @@
 (defun adh--ml-island (&rest parts)
   "Join PARTS, drop nils, and wrap the result in a rounded island."
   (let ((body (mapconcat #'adh--ml-on-isle (delq nil parts) "")))
-    (unless (string-empty-p (string-trim body))
+    (when (string-match-p "[^ \t\n\r]" body)
       (concat (adh--ml-cap adh--ml-cap-l adh--ml-isle adh--ml-bg)
               body
               (if (string-suffix-p adh--ml-cap-r body) "" (adh--ml-on-isle " "))
@@ -121,7 +127,7 @@
   (let ((body (mapconcat #'identity (delq nil parts) "  ")))
     (unless (string-empty-p body)
       (concat (adh--ml-cap adh--ml-cap-l bg adh--ml-isle)
-              (let ((b (copy-sequence (concat " " body " "))))
+              (let ((b (concat " " body " ")))
                 (add-face-text-property 0 (length b) `(:background ,bg) t b)
                 b)
               (adh--ml-cap adh--ml-cap-r bg adh--ml-isle)))))
@@ -296,8 +302,7 @@
          (pct (if (zerop span)
                   0
                 (/ (* 100 (- (point) (point-min))) span))))
-    (adh--ml-tint (adh--ml-escape (concat rowcol " " (format "%d%%" pct)))
-                  adh--ml-fg)))
+    (adh--ml-tint (concat rowcol " " (number-to-string pct) "%%") adh--ml-fg)))
 
 (defun adh--segment-modal-fn ()
   "Return the current meow state as a faced N/I/M pill, or nil."
@@ -445,7 +450,7 @@
 (defconst adh--ml-minors-excluded
   '(flymake-mode eglot--managed-mode
     meow-normal-mode meow-insert-mode meow-motion-mode
-    company-posframe-mode)
+    completion-preview-mode)
   "Minor modes that have a segment of their own, or none worth showing.")
 
 (defun adh--ml-active-minor-modes ()
@@ -609,12 +614,12 @@ The count or the dots toggle the list; a lighter opens its mode's menu."
         (right (adh--ml-right)))
     (if (not right)
         left
-      (concat left
-              (propertize " " 'display
-                          `(space :align-to
-                                  (- (+ right right-fringe right-margin)
-                                     ,(adh--ml-width right))))
-              right))))
+      (list (or left "")
+            (propertize " " 'display
+                        `(space :align-to
+                                (- (+ right right-fringe right-margin)
+                                   ,(adh--ml-width right))))
+            right))))
 
 (defun adh--ml-render ()
   "Render the mode line, quietened while the minibuffer is active."

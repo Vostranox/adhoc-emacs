@@ -16,18 +16,10 @@ done
 
 EMACS_DIR="$HOME/.emacs.d"
 FD_DIR="$EMACS_DIR/opt/fd"
-THEMES_DIR="$EMACS_DIR/themes"
 
 pull_ff() {
     git -C "$1" pull --ff-only || echo "[adh][warning] skipping update of '$1'" >&2
 }
-
-mkdir -p "$THEMES_DIR"
-if [[ -d "$THEMES_DIR/gruber-material-dark/.git" ]]; then
-    pull_ff "$THEMES_DIR/gruber-material-dark"
-else
-    git clone https://github.com/Vostranox/gruber-material-dark.git "$THEMES_DIR/gruber-material-dark"
-fi
 
 mkdir -p "$FD_DIR"
 if [[ -d "$FD_DIR/.git" ]]; then

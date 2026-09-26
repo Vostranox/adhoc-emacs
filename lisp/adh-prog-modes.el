@@ -16,26 +16,19 @@
   :hook
   (c-ts-mode . (lambda () (setq-local comment-start "// ") (setq-local comment-end ""))))
 
+(defun adh--treesit-no-error-face ()
+  "Don't paint tree-sitter ERROR nodes red, so incomplete code isn't a wall of error-face."
+  (treesit-font-lock-recompute-features nil '(error)))
+
 (use-package rust-ts-mode
   :ensure nil :defer t
-  :config
-  ;; Drop the rule that paints tree-sitter ERROR nodes red, so incomplete code
-  ;; while typing isn't a wall of error-face.
-  (setq rust-ts-mode--font-lock-settings
-        (cl-remove-if
-         (lambda (entry)
-           (eq (nth 2 entry) 'error))
-         rust-ts-mode--font-lock-settings)))
+  :hook
+  (rust-ts-mode . adh--treesit-no-error-face))
 
 (use-package zig-ts-mode
   :ensure t :defer t
-  :config
-  ;; Same as rust-ts-mode: don't paint tree-sitter ERROR nodes red.
-  (setq zig-ts--font-lock-settings
-        (cl-remove-if
-         (lambda (entry)
-           (eq (nth 2 entry) 'error))
-         zig-ts--font-lock-settings)))
+  :hook
+  (zig-ts-mode . adh--treesit-no-error-face))
 
 (use-package markdown-mode
   :ensure t :defer t

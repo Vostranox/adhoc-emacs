@@ -78,9 +78,7 @@
 (use-package treesit
   :ensure nil
   :custom
-  (treesit-font-lock-level 4)
-  :config
-  (advice-add #'treesit-forward-sexp :override #'forward-sexp-default-function))
+  (treesit-font-lock-level 4))
 
 (use-package isearch
   :ensure nil
@@ -150,19 +148,13 @@
   :hook
   (org-mode . org-indent-mode))
 
-(use-package bookmark
-  :init
-  (setq bookmark-default-file (no-littering-expand-var-file-name "bookmarks")))
+(use-package bookmark)
 
 (use-package savehist
-  :init
-  (setq savehist-file (no-littering-expand-var-file-name "history"))
   :config
   (savehist-mode 1))
 
 (use-package recentf
-  :init
-  (setq recentf-save-file (no-littering-expand-var-file-name "recentf"))
   :custom
   (recentf-exclude '("^/tmp"))
   (recentf-max-menu-items 10)
@@ -173,8 +165,7 @@
 Already-open files just switch to their buffer.  Marginalia annotates the
 candidates as files because `recentf-open' is in `marginalia-command-categories'."
     (interactive)
-    (require 'consult)
-    (find-file (completing-read "Open: " (mapcar #'consult--fast-abbreviate-file-name recentf-list) nil t)))
+    (find-file (completing-read "Open: " (mapcar #'abbreviate-file-name recentf-list) nil t)))
   (recentf-mode 1))
 
 (use-package vc
@@ -183,16 +174,11 @@ candidates as files because `recentf-open' is in `marginalia-command-categories'
   (defconst adh--vc-mode-line-name " vc")
   :custom
   (auto-revert-check-vc-info nil)
-  (vc-handled-backends nil)
   :config
   (defvar adh--vc-enabled nil)
   (add-to-list 'minor-mode-alist '(adh--vc-enabled adh--vc-mode-line-name)))
 
-(use-package transient
-  :init
-  (setq transient-history-file (no-littering-expand-var-file-name "transient/history.el")
-        transient-levels-file (no-littering-expand-var-file-name "transient/levels.el")
-        transient-values-file (no-littering-expand-var-file-name "transient/values.el")))
+(use-package transient)
 
 (use-package ediff
   :ensure nil :defer t

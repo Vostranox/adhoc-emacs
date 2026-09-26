@@ -8,6 +8,13 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
       (make-directory dir t)))
   nil)
 
+(use-package gruber-material-dark
+  :vc (:url "https://github.com/Vostranox/gruber-material-dark")
+  :demand t
+  :config
+  (unless (custom-theme-enabled-p 'gruber-material-dark-intense)
+    (load-theme 'gruber-material-dark-intense :no-confirm)))
+
 (use-package emacs
   :ensure nil
   :init
@@ -22,15 +29,7 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
         `((".*" ,(no-littering-expand-var-file-name "autosaves/") t))
         auto-save-list-file-prefix
         (no-littering-expand-var-file-name "autosaves/.saves-")
-        make-backup-files nil
-        backup-directory-alist
-        `(("." . ,(no-littering-expand-var-file-name "backup/")))
-        delete-old-versions t
-        kept-new-versions 6
-        kept-old-versions 2
-        version-control t)
-
-  (setq-default abbrev-file-name (no-littering-expand-etc-file-name "abbrev_defs"))
+        make-backup-files nil)
 
   :custom
   (auto-revert-verbose nil)
@@ -147,6 +146,9 @@ Hooked into `find-file-not-found-functions' so new files in new folders just wor
            (window-parameters . ((no-other-window . t))))))
 
   (setq-default truncate-lines nil)
+
+  (setq switch-to-prev-buffer-skip
+        (lambda (_window buf _bury-or-kill) (not (adh--buffer-listable-p buf))))
 
   (advice-add 'read-buffer-to-switch :filter-args #'(lambda (args) (list "Switch to: ")))
 

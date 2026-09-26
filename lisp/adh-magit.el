@@ -1,5 +1,9 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(eval-when-compile
+  (when (bound-and-true-p byte-compile-current-file)
+    (require 'magit)))
+
 ;; A trimmed magit-status that shows only the staging-relevant sections.
 (define-derived-mode magit-staging-mode magit-status-mode "magit-staging"
   "Like `magit-status-mode' but limited to staged/unstaged changes."

@@ -81,9 +81,4 @@
   :config
   (corfu-prescient-mode))
 
-(use-package company-prescient
-  :ensure t :after company
-  :config
-  (company-prescient-mode))
-
 (provide 'adh-minibuffer)

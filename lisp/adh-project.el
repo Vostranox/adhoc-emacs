@@ -55,8 +55,6 @@ A project is the nearest ancestor containing one of
 
 (use-package project
   :ensure nil :defer t
-  :init
-  (setq project-list-file (no-littering-expand-var-file-name "projects"))
   :config
   (setq project-find-functions #'adh--project-try))
 

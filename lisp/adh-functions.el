@@ -377,9 +377,6 @@ the most recently used window is kept."
    (read-buffer "Buffer: " nil t
                 #'(lambda (arg) (adh--buffer-listable-p (cdr arg))))))
 
-(setq switch-to-prev-buffer-skip
-      (lambda (_window buf _bury-or-kill) (not (adh--buffer-listable-p buf))))
-
 (defun adh-kill-other-buffers ()
   "Kill all buffers except visible ones, *scratch*, *Messages* and internal buffers."
   (interactive)
@@ -594,34 +591,29 @@ A numeric suffix is added as needed to avoid overwriting."
 (defun adh-upgrade-packages (&optional query)
   "Upgrade all packages, including those installed with package-vc."
   (interactive (list t))
-  (require 'package-vc)
-  (let ((vc-handled-backends (if (memq 'Git vc-handled-backends)
-                                 vc-handled-backends
-                               (cons 'Git vc-handled-backends))))
-    (package-upgrade-all query)
-    (package-vc-upgrade-all)))
+  (package-upgrade-all query)
+  (package-vc-upgrade-all))
+
+(defun adh--tmux-capture (buffer &optional history)
+  "Capture the tmux pane into BUFFER, with its full HISTORY when non-nil."
+  (let ((content (shell-command-to-string
+                  (format "%s capture-pane -p%s" adh--tmux-command (if history " -S -" "")))))
+    (with-current-buffer (get-buffer-create buffer)
+      (erase-buffer)
+      (insert content))
+    (switch-to-buffer buffer)
+    (goto-char (point-max))
+    (skip-chars-backward " \t\n")))
 
 (defun adh-tmux-to-emacs-buffer ()
   "Capture the visible tmux pane into the *tmux* buffer."
   (interactive)
-  (let ((content (shell-command-to-string (format "%s capture-pane -p" adh--tmux-command))))
-    (with-current-buffer (get-buffer-create "*tmux*")
-      (erase-buffer)
-      (insert content))
-    (switch-to-buffer "*tmux*")
-    (goto-char (point-max))
-    (skip-chars-backward " \t\n")))
+  (adh--tmux-capture "*tmux*"))
 
 (defun adh-tmux-to-emacs-buffer-all ()
   "Capture the full tmux pane history into the *tmux-all* buffer."
   (interactive)
-  (let ((content (shell-command-to-string (format "%s capture-pane -p -S -" adh--tmux-command))))
-    (with-current-buffer (get-buffer-create "*tmux-all*")
-      (erase-buffer)
-      (insert content))
-    (switch-to-buffer "*tmux-all*")
-    (goto-char (point-max))
-    (skip-chars-backward " \t\n")))
+  (adh--tmux-capture "*tmux-all*" t))
 
 (defun adh-tmux-cd (&optional target)
   "Send a `cd' to Emacs's current directory to tmux, asynchronously."

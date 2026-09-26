@@ -77,7 +77,7 @@ The remaining BODY is bindings as in `adh-keymap-set'."
 
 ;; M
 (adh-keymap-set global-map
-  ("M-r" #'adh-consult-point-to-register)
+  ("M-r" #'point-to-register)
   ("M-t" #'transpose-words)
   ("M-o" #'zoxide-travel)
   ("M-u" #'indent-region)
@@ -180,7 +180,7 @@ The remaining BODY is bindings as in `adh-keymap-set'."
   :map global-map
   :prefix "C-x C-o"
   ("l" #'tab-switch)
-  ("d" #'adh-consult-jump-to-register)
+  ("d" #'adh-jump-to-register)
   ("c" #'adh-switch-to-buffer)
   ("b" #'bookmark-jump)
   ("x" #'adh-toggle-meow-motion-mode)
@@ -203,7 +203,7 @@ The remaining BODY is bindings as in `adh-keymap-set'."
   :map adh-leader-map
   :prefix "t"
   ("f" #'adh-consult-ripgrep-here)
-  ("o" #'adh-consult-imenu)
+  ("o" #'consult-imenu)
   ("h" #'adh-consult-ripgrep-project)
   ("e" #'adh-consult-ripgrep-dirs)
   ("a" #'adh-consult-line-with-region))
@@ -372,7 +372,7 @@ The remaining BODY is bindings as in `adh-keymap-set'."
     '("r" . exchange-point-and-mark)
     '("t" . adh-meow-insert)
     '("s" . adh-meow-insert-replace)
-    '("g g" . adh-consult-goto-line)
+    '("g g" . consult-goto-line)
     '("g h" . adh-avy-goto-line-indent)
     '("z" . kill-word)
     '("x" . kill-whole-line)

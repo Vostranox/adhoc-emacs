@@ -90,9 +90,9 @@
   (with-eval-after-load 'company
     (let* ((kind-func (lambda (cand) (company-call-backend 'kind cand)))
            (formatter (kind-icon-margin-formatter `((company-kind . ,kind-func)))))
-      (defun my-company-kind-icon-margin (cand _selected)
+      (defun adh--company-kind-icon-margin (cand _selected)
         (funcall formatter cand))
-      (setq company-format-margin-function #'my-company-kind-icon-margin)))
+      (setq company-format-margin-function #'adh--company-kind-icon-margin)))
   (with-eval-after-load 'corfu
     (add-to-list 'corfu-margin-formatters #'kind-icon-margin-formatter))
   (setq kind-icon-mapping

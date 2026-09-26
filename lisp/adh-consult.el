@@ -138,20 +138,6 @@ INITIAL is the initial search input."
           (consult-line input))
       (consult-line))))
 
-(defun adh-consult-imenu ()
-  "Jump to an imenu entry with live preview."
-  (interactive)
-  (require 'consult)
-  (let ((consult-preview-key 'any))
-    (consult-imenu)))
-
-(defun adh-consult-goto-line ()
-  "Go to a line number with live preview."
-  (interactive)
-  (require 'consult)
-  (let ((consult-preview-key 'any))
-    (consult-goto-line)))
-
 (defun adh-consult-locate (&optional initial)
   "Locate files by name, seeded with the active region or INITIAL."
   (interactive)
@@ -183,16 +169,9 @@ INITIAL is the initial search input."
         (when choice
           (select-window (cdr (assoc choice cands)))))))))
 
-(defun adh-consult-point-to-register ()
-  "Calls point-to-register."
+(defun adh-jump-to-register ()
+  "Jump to a register, then recenter."
   (interactive)
-  (require 'consult)
-  (call-interactively #'point-to-register))
-
-(defun adh-consult-jump-to-register ()
-  "Calls jump-to-register"
-  (interactive)
-  (require 'consult)
   (call-interactively #'jump-to-register)
   (recenter))
 
@@ -228,6 +207,10 @@ INITIAL is the initial search input."
 
 (use-package consult
   :ensure t :defer t
+  :init
+  (setq register-preview-delay 0.4
+        register-preview-function #'consult-register-format)
+  (advice-add #'register-preview :override #'consult-register-window)
   :custom
   (consult-buffer-filter '("\\` " "\\`\\*"))
   (consult-narrow-key "C-,")
@@ -253,11 +236,8 @@ INITIAL is the initial search input."
     (_
      (setq consult-locate-args "locate -i -r")))
 
-  (setq register-preview-delay 0.4
-        register-preview-function #'consult-register-format)
-  (advice-add #'register-preview :override #'consult-register-window)
-
-  (consult-customize consult-flymake :keymap adh-consult-flymake-map))
+  (consult-customize consult-flymake :keymap adh-consult-flymake-map)
+  (consult-customize consult-imenu consult-goto-line :preview-key 'any))
 
 (use-package embark
   :ensure t

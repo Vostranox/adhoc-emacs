@@ -38,7 +38,7 @@
     '("s" . exchange-point-and-mark)
     '("d" . adh-meow-insert)
     '("f" . adh-meow-insert-replace)
-    '("g g" . adh-consult-goto-line)
+    '("g g" . consult-goto-line)
     (cons "g h" (=> (avy-goto-line) (back-to-indentation)))
 
     '("z" . kill-word)
