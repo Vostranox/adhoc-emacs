@@ -11,6 +11,13 @@ Set to nil if you want to define your own layout from scratch."
   :type '(choice (const :tag "Use AdHoc Custom Layout" t)
                  (const :tag "Disable (Write Your Own)" nil)))
 
+(defcustom adh-use-dirvish t
+  "When non-nil, Dired buffers open in Dirvish.
+Set it in the pre-init file, or call `adh-set-use-dirvish' afterwards."
+  :group 'adhoc
+  :type '(choice (const :tag "Use Dirvish" t)
+                 (const :tag "Plain Dired" nil)))
+
 (defcustom adh-completion-ui 'company
   "In-buffer completion UI to use: `company' or `corfu'."
   :group 'adhoc

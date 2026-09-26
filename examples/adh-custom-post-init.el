@@ -6,6 +6,7 @@
 
 (adh-set-eglot-stay-out-of '(eldoc flymake yas))
 (adh-set-completion-ui 'company)
+(adh-set-use-dirvish t)
 
 (adh-set-frame-opacity 100)
 (adh-set-window-decoration t)

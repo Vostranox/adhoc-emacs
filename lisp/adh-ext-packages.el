@@ -13,10 +13,47 @@
   (avy-goto-line)
   (back-to-indentation))
 
+(defun adh-set-use-dirvish (on)
+  "Open Dired buffers in Dirvish when ON is non-nil, else in plain Dired.
+Interactively, toggle.  Buffers already open keep their current look."
+  (interactive (list (not adh-use-dirvish)))
+  (when (and on (not (fboundp 'dirvish-override-dired-mode)))
+    (user-error "Dirvish is not installed"))
+  (setq adh-use-dirvish on)
+  (cond (on (dirvish-override-dired-mode 1))
+        ((bound-and-true-p dirvish-override-dired-mode)
+         (dirvish-override-dired-mode -1)))
+  (message "[adh] Dirvish %s" (if on "enabled" "disabled")))
+
 (use-package zoxide
   :ensure t
   :hook
   (find-file . zoxide-add))
+
+(use-package dirvish
+  :vc (:url "https://github.com/Vostranox/dirvish")
+  :defer t
+  :custom
+  (dirvish-use-header-line nil)
+  (dirvish-hide-cursor nil)
+  (dirvish-use-mode-line nil)
+  (dirvish-attributes '(collapse))
+  (dirvish-hide-details nil)
+  (dirvish-preview-dispatchers '(video image gif archive font pdf))
+  (dirvish-cache-dir (no-littering-expand-var-file-name "dirvish/"))
+  (dirvish-wdired-cursor nil)
+  (dirvish-preview-other-window nil)
+  (dirvish-fd-search-icon ":")
+  (dirvish-fd-switches "--full-path --hidden --no-ignore --exclude .git --path-separator=/")
+  (dirvish-fd-program (let ((fd (locate-user-emacs-file
+                                 (concat "opt/fd/bin/fd" (when (eq system-type 'windows-nt) ".exe")))))
+                        (if (file-executable-p fd) fd (executable-find "fd"))))
+  :init
+  (when adh-use-dirvish
+    (dirvish-override-dired-mode 1))
+  :config
+  (with-eval-after-load 'embark
+    (setf (alist-get 'file embark-exporters-alist) #'dirvish-embark-export)))
 
 (use-package multiple-cursors
   :ensure t :demand t

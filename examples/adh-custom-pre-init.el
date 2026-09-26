@@ -8,6 +8,8 @@
 
 (setq adh-completion-ui 'corfu)
 
+(setq adh-use-dirvish nil)
+
 (setq adh-frame-opacity 90)
 (setq adh-window-decoration t)
 

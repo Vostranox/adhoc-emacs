@@ -127,7 +127,10 @@ The remaining BODY is bindings as in `adh-keymap-set'."
 
 ;; C-x
 (adh-keymap-set global-map
-  ("C-x d" #'adh-switch-dired-buffer)
+  ("C-x d" (=> (call-interactively (if (and adh-use-dirvish (fboundp 'dirvish-history-jump))
+                                        #'dirvish-history-jump
+                                      #'adh-switch-dired-buffer)))
+   "dirvish-history-jump")
   ("C-x b" #'switch-to-buffer)
   ("C-x j" (=> (find-file (adh--get-project-dir))) "find-file-project-root")
   ("C-x f" #'find-file-at-point)
@@ -491,6 +494,17 @@ The remaining BODY is bindings as in `adh-keymap-set'."
     ("C-," #'adh-dired-duplicate-dwim)
     ("M-o" #'zoxide-travel)
     ("M-a" #'dired-toggle-read-only)))
+
+(with-eval-after-load 'dirvish
+  (adh-keymap-set dirvish-mode-map
+    ("TAB" #'dirvish-subtree-toggle)
+    ("<backtab>" (=> (dirvish-subtree-up) (dirvish-subtree-toggle)) "dirvish-subtree-close")
+    ("," #'dirvish-layout-toggle)
+    ("." #'dirvish-fd-search)
+    ("g" #'dirvish-fd-search-again)
+    ("/" #'dirvish-narrow)
+    ("y" #'dirvish-yank-menu)
+    ("v" #'dirvish-vc-menu)))
 
 (with-eval-after-load 'wdired
   (adh-keymap-set wdired-mode-map
