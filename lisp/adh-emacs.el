@@ -3,6 +3,8 @@
 (require 'adh-vars)
 (require 'adh-functions)
 
+(defvar ns-use-proxy-icon)
+
 (defun adh--create-parent-dir-on-the-fly ()
   "Create a missing parent directory for the visited file."
   (let ((dir (file-name-directory buffer-file-name)))
@@ -119,6 +121,13 @@
   (unless (display-graphic-p)
     (set-terminal-coding-system 'utf-8-unix)
     (set-keyboard-coding-system 'utf-8-unix))
+
+  (add-to-list 'default-frame-alist '(fullscreen . maximized))
+  (when (eq system-type 'darwin)
+    (setq ns-use-proxy-icon nil
+          frame-resize-pixelwise t)
+    (add-to-list 'default-frame-alist '(ns-appearance . dark))
+    (add-to-list 'default-frame-alist '(ns-transparent-titlebar . t)))
 
   (adh--apply-window-decoration adh-window-decoration)
   (adh--apply-frame-opacity adh-frame-opacity)

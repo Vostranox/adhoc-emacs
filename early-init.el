@@ -5,12 +5,8 @@
 (scroll-bar-mode 0)
 (tool-bar-mode 0)
 
-(setq frame-inhibit-implied-resize t)
-(add-to-list 'default-frame-alist '(fullscreen . maximized))
-(when (eq system-type 'darwin)
-  (setq ns-use-proxy-icon nil)
-  (add-to-list 'default-frame-alist '(ns-appearance . dark))
-  (add-to-list 'default-frame-alist '(ns-transparent-titlebar . t)))
+(unless (eq system-type 'darwin)
+  (setq frame-inhibit-implied-resize t))
 
 (setq inhibit-startup-message t)
 (defun display-startup-echo-area-message ()
