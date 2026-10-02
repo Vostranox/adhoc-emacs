@@ -43,5 +43,4 @@
     (error (message "Failed to load theme: %s" (error-message-string err)))))
 
 (add-to-list 'load-path (locate-user-emacs-file "lisp"))
-(let ((load-prefer-newer t))
-  (require 'adh-startup))
+(require 'adh-startup (locate-user-emacs-file "lisp/adh-startup.el"))

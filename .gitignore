@@ -3,7 +3,7 @@
 !LICENSE
 !README.md
 !install.sh
-!init.el
+!config.el
 !early-init.el
 !lisp/
 !lisp/**

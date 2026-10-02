@@ -31,7 +31,9 @@ if [[ ! -d "$EMACS_DIR/elpa" ]]; then
     emacs --batch --eval "(progn
         (load-file \"$EMACS_DIR/early-init.el\")
         (setq gc-cons-threshold (* 64 1024 1024))
-        (load-file \"$EMACS_DIR/init.el\")
+        (load-file \"$EMACS_DIR/config.el\")
+        (when adh--init-errors-p
+          (error \"[adh] Configuration setup failed; fix the reported errors before building\"))
         (let ((user-init-file custom-file))
           (package--save-selected-packages package-selected-packages))
         (adh-treesit-ensure-grammars))"
@@ -54,6 +56,6 @@ emacs --batch --eval "(progn
       (while (process-live-p proc)
         (accept-process-output proc 0.1))
       (unless (zerop (process-exit-status proc))
-        (princ (with-current-buffer \" *adh-compile-config*\" (buffer-string))))
-      (kill-emacs (process-exit-status proc))))" ||
-    echo "[adh][warning] compiling lisp/ failed; run M-x adh-compile-config to retry" >&2
+        (princ (with-current-buffer \" *adh-compile-config*\" (buffer-string)))
+        (message \"[adh][error] Building init failed; run M-x adh-compile-config to retry\"))
+      (kill-emacs (process-exit-status proc))))"

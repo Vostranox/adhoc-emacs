@@ -3,6 +3,8 @@
 (require 'adh-vars)
 (require 'adh-functions)
 
+(defvar embark-exporters-alist)
+
 (defun adh-mc-keyboard-quit-dwim ()
   "Exit multiple-cursors if active, otherwise `adh-keyboard-quit-dwim'."
   (interactive)
