@@ -6,6 +6,8 @@
 
 (setq adh-use-custom-keybinds nil)
 
+(setq adh-auto-compile-config nil)
+
 (setq adh-completion-style 'minimal)
 (setq adh-completion-ui 'popup)
 (setq adh-completion-keys 'tab-only)

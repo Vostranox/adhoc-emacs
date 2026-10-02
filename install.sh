@@ -50,10 +50,10 @@ fi
 
 emacs --batch --eval "(progn
     (load-file \"$EMACS_DIR/early-init.el\")
-    (let ((proc (adh-compile-config)))
+    (let ((proc (adh-compile-config t)))
       (while (process-live-p proc)
         (accept-process-output proc 0.1))
       (unless (zerop (process-exit-status proc))
         (princ (with-current-buffer \" *adh-compile-config*\" (buffer-string))))
       (kill-emacs (process-exit-status proc))))" ||
-    echo "[adh][warning] compiling lisp/ failed; Emacs will retry at startup" >&2
+    echo "[adh][warning] compiling lisp/ failed; run M-x adh-compile-config to retry" >&2

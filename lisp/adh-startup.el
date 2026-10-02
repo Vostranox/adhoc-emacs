@@ -3,6 +3,13 @@
 (when (version< emacs-version "31")
   (error "[adh][error] The configuration assumes Emacs 31 or newer (found %s)." emacs-version))
 
+(defcustom adh-auto-compile-config nil
+  "When non-nil, check and rebuild stale compiled configuration after startup.
+Compilation runs in a background Emacs and takes effect next session.
+When nil, use `adh-compile-config' to check and compile on demand."
+  :group 'adhoc
+  :type 'boolean)
+
 (defvar adh--init-errors-p nil
   "Non-nil if any adhoc loading errors occurred during initialization.")
 
@@ -77,9 +84,33 @@
   (dolist (elc (directory-files (locate-user-emacs-file "lisp/") t "\\.elc\\'"))
     (delete-file elc)))
 
-(defun adh-compile-config ()
-  "Byte-compile lisp/ in a background Emacs, for the next session."
-  (interactive)
+(defun adh--package-quickstart-stale-p ()
+  "Return non-nil if the package quickstart files need rebuilding."
+  (or (not (file-exists-p package-quickstart-file))
+      (file-newer-than-file-p package-user-dir package-quickstart-file)
+      (file-newer-than-file-p package-quickstart-file (concat package-quickstart-file "c"))))
+
+(defun adh-compile-config (&optional force)
+  "Rebuild stale lisp/ byte-code and package quickstart files for next session.
+With a prefix argument FORCE, rebuild even when everything is up to date.
+Return the background build process, or nil if no rebuild is needed.
+If a build is already running, return that process."
+  (interactive "P")
+  (let ((proc (get-process "adh-compile-config")))
+    (cond
+     ((and proc (process-live-p proc))
+      (when (called-interactively-p 'interactive)
+        (message "[adh] Configuration compilation is already running"))
+      proc)
+     ((or force (adh--config-stale-p) (adh--package-quickstart-stale-p))
+      (adh--compile-config))
+     (t
+      (when (called-interactively-p 'interactive)
+        (message "[adh] Compiled configuration is up to date"))
+      nil))))
+
+(defun adh--compile-config ()
+  "Start a background rebuild of lisp/ and the package quickstart files."
   (adh--delete-config-elc)
   (let ((dir (locate-user-emacs-file "lisp/")))
     (make-process
@@ -90,19 +121,22 @@
      :noquery t
      :command `(,(expand-file-name invocation-name invocation-directory)
                 "-Q" "--batch" "-L" ,dir
-                "--eval" ,(format "(setq package-user-dir %S)" package-user-dir)
+                "--eval" ,(prin1-to-string
+                           `(setq user-emacs-directory ,user-emacs-directory
+                                  package-user-dir ,package-user-dir
+                                  package-quickstart-file ,package-quickstart-file))
                 ,@(when (native-comp-available-p)
                     (list "--eval" (format "(startup-redirect-eln-cache %S)"
                                            (car native-comp-eln-load-path))))
-                "-f" "package-activate-all"
-                "--eval" ,(prin1-to-string native-comp-async-env-modifier-form)
                 "--eval" ,(prin1-to-string
-                           `(with-demoted-errors "[adh][error] Package quickstart: %S"
+                           '(progn
                               (require 'package)
-                              (setq package-quickstart-file ,package-quickstart-file)
                               (make-directory (file-name-directory package-quickstart-file) t)
                               (let ((warning-inhibit-types '((bytecomp))))
-                                (package-quickstart-refresh))))
+                                (unless (package-quickstart-refresh)
+                                  (error "[adh] Compiling package quickstart failed")))))
+                "-f" "package-activate-all"
+                "--eval" ,(prin1-to-string native-comp-async-env-modifier-form)
                 "-f" "batch-byte-compile"
                 ,@(directory-files dir t "\\`adh-.*\\.el\\'"))
      :sentinel (lambda (proc _)
@@ -111,10 +145,11 @@
                        (message "[adh] Compiled lisp/")
                      (display-warning 'adhoc "[adh][warning] Compiling lisp/ failed; see buffer \" *adh-compile-config*\"")))))))
 
-(add-hook 'emacs-startup-hook
-          (lambda ()
-            (when (and (not adh--init-errors-p)
-                       (or (adh--config-stale-p) (not (file-exists-p package-quickstart-file))))
-              (adh-compile-config))))
+(defun adh--maybe-compile-config ()
+  "Check and rebuild the configuration after startup when opted in."
+  (when (and adh-auto-compile-config (not adh--init-errors-p))
+    (adh-compile-config)))
+
+(add-hook 'emacs-startup-hook #'adh--maybe-compile-config)
 
 (provide 'adh-startup)

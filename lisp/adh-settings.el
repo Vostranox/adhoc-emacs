@@ -4,11 +4,12 @@
   (when (bound-and-true-p byte-compile-current-file)
     (require 'transient)))
 (require 'adh-functions)
+(require 'adh-startup)
 
 (defconst adh--settings-options
   '(adh-completion-style adh-completion-ui adh-completion-keys adh-use-lsp adh-use-vc adh-subwords adh-use-which-key adh-lsp-diagnostics
     adh-lsp-format-on-save adh-use-dirvish adh-window-decoration adh-frame-opacity
-    adh-list-max-height adh-mono-spaced-font adh-mono-spaced-font-size)
+    adh-list-max-height adh-mono-spaced-font adh-mono-spaced-font-size adh-auto-compile-config)
   "Options the settings menu shows and saves.")
 
 (defun adh--settings-unsaved-p (var)
@@ -124,15 +125,20 @@ LSP goes first, so servers are not restarted just before being shut down."
   (interactive)
   (adh--toggle-setting 'adh-window-decoration "Window decorations"))
 
+(defun adh-toggle-auto-compile-config ()
+  "Toggle checking and rebuilding stale configuration on future startups."
+  (interactive)
+  (adh--toggle-setting 'adh-auto-compile-config "Automatic config compilation"))
+
 (defun adh-settings ()
-  "Change completion, LSP and display settings; S saves them for the next start."
+  "Change AdHoc settings; S saves them for the next start."
   (interactive)
   (require 'transient)
   (call-interactively #'adh-settings))
 
 (with-eval-after-load 'transient
   (transient-define-prefix adh-settings ()
-    "Change completion, LSP and display settings; S saves them for the next start."
+    "Change AdHoc settings; S saves them for the next start."
     :transient-suffix t
     [["Completion" :if (lambda () (featurep 'adh-completion))
       ("n" (lambda () (interactive) (customize-set-variable 'adh-completion-style 'none))
@@ -198,6 +204,9 @@ LSP goes first, so servers are not restarted just before being shut down."
                                                             adh-mono-spaced-font-size 1)))
              (customize-set-variable 'adh-mono-spaced-font-size height))
        :description (lambda () (adh--settings-gui-only (adh--settings-value "font size" 'adh-mono-spaced-font-size))))]]
+    ["Startup"
+     ("C" adh-toggle-auto-compile-config
+      :description (lambda () (adh--settings-switch "auto compile" 'adh-auto-compile-config)))]
     [("R" (lambda () (interactive) (adh--settings-restore-defaults))
       :description "restore defaults")
      ("S" (lambda () (interactive) (adh--settings-save-all))

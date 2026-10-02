@@ -45,6 +45,3 @@
 (add-to-list 'load-path (locate-user-emacs-file "lisp"))
 (let ((load-prefer-newer t))
   (require 'adh-startup))
-
-(when (adh--config-stale-p)
-  (adh--delete-config-elc))
