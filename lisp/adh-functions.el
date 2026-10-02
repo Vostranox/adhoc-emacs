@@ -328,22 +328,37 @@ Output buffers (compile, grep, shell) get the cap up front; others fit."
            display-buffer-overriding-action)))
     (popper-toggle-type)))
 
-(defun adh--main-window ()
-  "Return the most recently used window that is not a side window."
-  (car (sort (seq-remove (lambda (w) (window-parameter w 'window-side))
+(defun adh--main-window (&optional reusable)
+  "Return the most recently used window that is not a side window.
+When REUSABLE is non-nil, exclude dedicated windows."
+  (car (sort (seq-remove (lambda (w)
+                          (or (window-parameter w 'window-side)
+                              (and reusable (window-dedicated-p w))))
                          (window-list nil 'nomini))
              (lambda (a b) (> (window-use-time a) (window-use-time b))))))
 
+(defun adh-delete-window ()
+  "Delete the selected window, or bury a popup in the sole main window."
+  (interactive)
+  (if (and (memq (bound-and-true-p popper-popup-status) '(popup user-popup))
+           (eq (selected-window) (window-main-window)))
+      (quit-window)
+    (delete-window)))
+
 (defun adh-delete-other-windows ()
-  "Delete other windows, keeping side panels such as treemacs.
-A popup stays a popup; from a side panel, the last used window stays."
+  "Delete other windows, keeping protected side panels.
+Maximize a popup in a non-dedicated main window without changing its status.
+From a protected side panel, keep the last used main window."
   (interactive)
   (let ((win (selected-window)))
     (if (not (window-parameter win 'window-side))
         (delete-other-windows win)
-      (let ((main (adh--main-window)))
-        (unless (window-parameter win 'no-delete-other-windows)
-          (set-window-dedicated-p main nil)
+      (let* ((keep-side (window-parameter win 'no-delete-other-windows))
+             (main (or (adh--main-window (not keep-side))
+                       (user-error "No suitable main window available"))))
+        (unless keep-side
+          ;; Let quitting restore even buffers hidden by our switching filter.
+          (display-buffer-record-window 'reuse main (window-buffer win))
           (set-window-buffer main (window-buffer win)))
         (delete-other-windows main)
         (select-window (if (window-live-p win) win main))))))

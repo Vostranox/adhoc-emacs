@@ -206,7 +206,7 @@
   :prefix "h"
   "l" #'kill-buffer-and-window
   "d" #'adh-delete-other-windows
-  "c" #'delete-window
+  "c" #'adh-delete-window
   "n" #'balance-windows
   "r" #'window-layout-rotate-clockwise
   "t" #'split-window-vertically
