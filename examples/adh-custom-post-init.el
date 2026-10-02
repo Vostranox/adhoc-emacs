@@ -20,6 +20,8 @@
         adh-mono-spaced-font-size 110)
 
 (when (eq system-type 'windows-nt)
+  (setq shell-file-name "powershell.exe"
+        shell-command-switch "-Command")
   (adh-add-to-path "C:/Program Files/Git/bin")
   (adh-add-to-path "C:/Program Files/Git/usr/bin")
   (setq insert-directory-program "C:/Program Files/Git/usr/bin/ls.exe")

@@ -305,12 +305,13 @@ Output buffers (compile, grep, shell) get the cap up front; others fit."
 
 (defun adh--popper-display (buffer &optional alist)
   "Show popup BUFFER where visible, else at the bottom, and select it."
-  (let ((win (or (display-buffer-reuse-window buffer alist)
-                 (popper-display-popup-at-bottom
-                  buffer (append alist '((window-parameters . ((no-other-window . t)))))))))
-    (when (window-parameter win 'window-side)
-      (adh--popper-window-height win))
-    (select-window win)))
+  (save-current-buffer
+    (let ((win (or (display-buffer-reuse-window buffer alist)
+                   (popper-display-popup-at-bottom
+                    buffer (append alist '((window-parameters . ((no-other-window . t)))))))))
+      (when (window-parameter win 'window-side)
+        (adh--popper-window-height win))
+      (select-window win))))
 
 (defun adh-select-popup ()
   "Select the open popup, or reopen the last one."

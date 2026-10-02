@@ -69,20 +69,16 @@ When nil, use `adh-compile-config' to check and compile on demand."
          (require 'no-littering nil t)))
 
 (defun adh--config-stale-p ()
-  "Return non-nil if a lisp/ .elc is missing or older than its .el, elpa/ or Emacs."
-  (let ((emacs (expand-file-name invocation-name invocation-directory)))
-    (catch 'stale
-      (dolist (el (directory-files (locate-user-emacs-file "lisp/") t "\\`adh-.*\\.el\\'"))
-        (let ((elc (concat el "c")))
-          (when (or (file-newer-than-file-p el elc)
-                    (file-newer-than-file-p package-user-dir elc)
-                    (file-newer-than-file-p emacs elc))
-            (throw 'stale t)))))))
-
-(defun adh--delete-config-elc ()
-  "Delete lisp/*.elc, so lisp/ loads from source."
-  (dolist (elc (directory-files (locate-user-emacs-file "lisp/") t "\\.elc\\'"))
-    (delete-file elc)))
+  "Return non-nil if generated init.el or init.elc needs rebuilding."
+  (let ((init (locate-user-emacs-file "init.el"))
+        (compiled (locate-user-emacs-file "init.elc"))
+        (config (locate-user-emacs-file "config.el")))
+    (or (not (file-exists-p init))
+        (not (file-exists-p config))
+        (seq-some (lambda (file) (file-newer-than-file-p file compiled))
+                  (append (list init config package-user-dir
+                                (expand-file-name invocation-name invocation-directory))
+                          (directory-files (locate-user-emacs-file "lisp/") t "\\`adh-.*\\.el\\'"))))))
 
 (defun adh--package-quickstart-stale-p ()
   "Return non-nil if the package quickstart files need rebuilding."
@@ -91,7 +87,7 @@ When nil, use `adh-compile-config' to check and compile on demand."
       (file-newer-than-file-p package-quickstart-file (concat package-quickstart-file "c"))))
 
 (defun adh-compile-config (&optional force)
-  "Rebuild stale lisp/ byte-code and package quickstart files for next session.
+  "Rebuild generated init.el, init.elc and package quickstart for next session.
 With a prefix argument FORCE, rebuild even when everything is up to date.
 Return the background build process, or nil if no rebuild is needed.
 If a build is already running, return that process."
@@ -110,8 +106,7 @@ If a build is already running, return that process."
       nil))))
 
 (defun adh--compile-config ()
-  "Start a background rebuild of lisp/ and the package quickstart files."
-  (adh--delete-config-elc)
+  "Start a background build without removing the previous working init."
   (let ((dir (locate-user-emacs-file "lisp/")))
     (make-process
      :name "adh-compile-config"
@@ -124,26 +119,18 @@ If a build is already running, return that process."
                 "--eval" ,(prin1-to-string
                            `(setq user-emacs-directory ,user-emacs-directory
                                   package-user-dir ,package-user-dir
-                                  package-quickstart-file ,package-quickstart-file))
+                                  package-quickstart-file ,package-quickstart-file
+                                  native-comp-jit-compilation nil))
                 ,@(when (native-comp-available-p)
                     (list "--eval" (format "(startup-redirect-eln-cache %S)"
                                            (car native-comp-eln-load-path))))
-                "--eval" ,(prin1-to-string
-                           '(progn
-                              (require 'package)
-                              (make-directory (file-name-directory package-quickstart-file) t)
-                              (let ((warning-inhibit-types '((bytecomp))))
-                                (unless (package-quickstart-refresh)
-                                  (error "[adh] Compiling package quickstart failed")))))
-                "-f" "package-activate-all"
-                "--eval" ,(prin1-to-string native-comp-async-env-modifier-form)
-                "-f" "batch-byte-compile"
-                ,@(directory-files dir t "\\`adh-.*\\.el\\'"))
+                "-l" ,(expand-file-name "adh-build.el" dir)
+                "-f" "adh--build-config")
      :sentinel (lambda (proc _)
                  (unless (process-live-p proc)
                    (if (zerop (process-exit-status proc))
-                       (message "[adh] Compiled lisp/")
-                     (display-warning 'adhoc "[adh][warning] Compiling lisp/ failed; see buffer \" *adh-compile-config*\"")))))))
+                       (message "[adh] Built init.el and init.elc")
+                     (display-warning 'adhoc "[adh][warning] Building init failed; see buffer \" *adh-compile-config*\"")))))))
 
 (defun adh--maybe-compile-config ()
   "Check and rebuild the configuration after startup when opted in."

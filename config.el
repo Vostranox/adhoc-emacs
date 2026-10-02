@@ -1,5 +1,8 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+;; Source entry point.  `adh-compile-config' expands the module loads below
+;; into generated init.el and compiles it to init.elc.
+
 (adh-require! 'adh-vars)
 
 (adh-load! "adh-custom-pre-init.el")
