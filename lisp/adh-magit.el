@@ -29,6 +29,20 @@
     (setq files (unless adh--magit-show-full-commit (list (oref chunk orig-file)))))
   (funcall fn rev args files module))
 
+(defun adh-git-commit-toggle-diff ()
+  "Toggle the inline diff without moving point in the commit message."
+  (interactive)
+  (unless (bound-and-true-p git-commit-mode)
+    (user-error "Not a Git commit message buffer"))
+  (save-excursion
+    (save-restriction
+      (widen)
+      (goto-char (point-min))
+      (unless (and (re-search-forward
+                    (format "^%s -+ >8 -+" (regexp-quote comment-start)) nil t)
+                   (push-button (line-beginning-position)))
+        (user-error "No inline diff in this commit message")))))
+
 (defun adh-magit-staging ()
   "Open the trimmed staging-only magit buffer."
   (interactive)

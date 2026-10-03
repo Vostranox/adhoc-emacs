@@ -8,6 +8,7 @@
 (defvar magit-mode-map)
 (defvar magit-hunk-section-map)
 (defvar magit-blame-read-only-mode-map)
+(defvar git-commit-mode-map)
 (defvar git-rebase-mode-map)
 (defvar ibuffer-mode-map)
 (defvar adh-consult-flymake-map)
@@ -511,6 +512,9 @@
     "." #'magit-blame-previous-chunk
     "w" #'magit-blame-copy-hash
     "C-w" #'adh-magit-blame-copy-short-hash))
+
+(with-eval-after-load 'git-commit
+  (keymap-set git-commit-mode-map "C-c d" #'adh-git-commit-toggle-diff))
 
 (with-eval-after-load 'git-rebase
   (define-keymap :keymap git-rebase-mode-map
