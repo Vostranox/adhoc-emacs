@@ -387,15 +387,19 @@ From a protected side panel, keep the last used main window."
                 #'(lambda (arg) (adh--buffer-listable-p (cdr arg))))))
 
 (defun adh-kill-other-buffers ()
-  "Kill every buffer except visible ones, *scratch*, *Messages* and internals."
+  "Kill buffers except those displayed in any tab on any frame.
+Also keep *scratch*, *Messages*, and internal buffers."
   (interactive)
+  (require 'tab-bar)
   (let ((keep (append (mapcar #'window-buffer (window-list-1 nil nil t))
                       (list (get-buffer "*scratch*")
                             (get-buffer "*Messages*"))))
         (count 0))
     (dolist (buf (buffer-list))
-      (unless (or (memq buf keep)
-                  (string-prefix-p " " (buffer-name buf)))
+      (unless (or (not (buffer-live-p buf))
+                  (memq buf keep)
+                  (string-prefix-p " " (buffer-name buf))
+                  (tab-bar-get-buffer-tab buf t))
         (when (kill-buffer buf)
           (setq count (1+ count)))))
     (message "Killed %d buffer(s)." count)))
@@ -516,7 +520,6 @@ ls-lisp ignores sort switches."
 (defun adh--apply-frame-opacity (opacity)
   "Set frame OPACITY (0-100); background only, except on Windows and macOS."
   (adh--apply-frame-parameter
-   ;; `alpha' is a window-manager hint; Hyprland ignores it.
    (if (memq system-type '(windows-nt darwin)) 'alpha 'alpha-background)
    opacity)
   (force-mode-line-update t))
