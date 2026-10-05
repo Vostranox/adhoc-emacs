@@ -45,4 +45,3 @@
 (adh-register-lsp-server '(c-ts-mode c++-ts-mode)
                          "/opt/llvm/bin/clangd" "--header-insertion=never")
 (adh-set-flycheck-executable 'c/c++-clang "/opt/llvm/bin/clang")
-(adh-set-flycheck-executable 'c/c++-clang-tidy "/opt/llvm/bin/clang-tidy")

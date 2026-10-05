@@ -116,7 +116,9 @@ FILES is an alist of temporary source paths and final destination paths."
         (progn
           (setq staged-init (make-temp-file (concat init ".build-") nil ".el")
                 staged-quickstart (make-temp-file (concat quickstart ".build-") nil ".el"))
+          (message "[adh] Generating init.el...")
           (adh--generate-init staged-init)
+          (message "[adh] Building package quickstart...")
           (let ((package-quickstart-file staged-quickstart)
                 (warning-inhibit-types '((bytecomp))))
             (require 'package)
@@ -124,8 +126,10 @@ FILES is an alist of temporary source paths and final destination paths."
               (error "[adh] Compiling package quickstart failed"))
             (package-activate-all))
           (eval native-comp-async-env-modifier-form t)
+          (message "[adh] Compiling init.el...")
           (unless (byte-compile-file staged-init)
             (error "[adh] Compiling generated init.el failed"))
+          (message "[adh] Publishing compiled configuration...")
           (adh--publish-config
            (list (cons staged-quickstart quickstart)
                  (cons (concat staged-quickstart "c") (concat quickstart "c"))
@@ -133,7 +137,8 @@ FILES is an alist of temporary source paths and final destination paths."
                  (cons (concat staged-init "c") (concat init "c"))))
           (dolist (file (directory-files (locate-user-emacs-file "lisp/") t "\\`adh-.*\\.elc\\'"))
             (with-demoted-errors "[adh][warning] Removing old byte-code: %S"
-              (delete-file file))))
+              (delete-file file)))
+          (message "[adh] Configuration build finished"))
       (dolist (file (list staged-init staged-quickstart))
         (when file
           (dolist (path (list file (concat file "c")))

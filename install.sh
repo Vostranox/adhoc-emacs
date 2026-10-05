@@ -39,6 +39,8 @@ if [[ ! -d "$EMACS_DIR/elpa" ]]; then
         (adh-treesit-ensure-grammars))"
 else
     emacs --batch --eval "(progn
+        (when (featurep 'native-compile)
+          (startup-redirect-eln-cache \"$EMACS_DIR/var/eln-cache/\"))
         (load \"$EMACS_DIR/lisp/adh-vars.el\")
         (with-demoted-errors \"[adh][error] adh-custom-pre-init.el: %S\"
           (load \"$EMACS_DIR/adh-custom-pre-init.el\" t))
@@ -56,6 +58,6 @@ emacs --batch --eval "(progn
       (while (process-live-p proc)
         (accept-process-output proc 0.1))
       (unless (zerop (process-exit-status proc))
-        (princ (with-current-buffer \" *adh-compile-config*\" (buffer-string)))
+        (princ (with-current-buffer (process-buffer proc) (buffer-string)))
         (message \"[adh][error] Building init failed; run M-x adh-compile-config to retry\"))
       (kill-emacs (process-exit-status proc))))"

@@ -107,7 +107,6 @@
 (keymap-set global-map "C-x RET o" #'adh-show-buffer-file-encoding)
 
 ;; M-g
-(keymap-set global-map "M-g f" #'consult-flycheck)
 (keymap-set global-map "M-g i" #'consult-imenu-multi)
 
 ;;; minibuffer map
@@ -136,8 +135,6 @@
   "C-e" #'previous-history-element
   "M-d" #'adh-shell-command-dir-pivot
   "M-." #'adh-shell-command-root-pivot)
-
-(keymap-set adh-consult-flycheck-map "M-a" #'adh-consult-flycheck-show-buffer-diagnostics)
 
 ;;; leader map
 
@@ -438,6 +435,7 @@
     "l" #'clipboard-kill-ring-save))
 
 (with-eval-after-load 'flycheck
+  (keymap-set global-map "M-g f" 'flycheck-command-map)
   (define-keymap :keymap flycheck-error-list-mode-map
     "<backspace>" #'adh-flycheck-display-diagnostic
     "." #'flycheck-error-list-previous-error

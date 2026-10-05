@@ -95,11 +95,12 @@ Command-specific Vertico layouts take precedence."
   :initialize #'custom-initialize-default
   :set (adh--custom-setter 'adh--apply-flycheck-annotate))
 
-(defcustom adh-flycheck-annotate-style 'below
+(defcustom adh-flycheck-annotate-style 'eol
   "Where the current line's inline diagnostic goes."
   :group 'adhoc
   :type '(choice (const :tag "Below the line" below)
-                 (const :tag "End of the line" eol))
+                 (const :tag "End of the line" eol)
+                 (const :tag "Right edge of the window" sideline))
   :initialize #'custom-initialize-default
   :set (adh--custom-setter 'adh--apply-flycheck-annotate-style))
 
@@ -198,6 +199,7 @@ Other grammars are installed the first time a file needs them."
 
 (defcustom adh-popup-buffers
   '("\\*Warnings\\*" "\\*Async Shell Command\\*" "Output\\*$"
+    "^\\*adh-compile-config\\*$"
     "\\*Embark Export" "^\\*e: " "\\*eldoc"
     help-mode apropos-mode messages-buffer-mode backtrace-mode
     compilation-mode comint-mode occur-mode xref--xref-buffer-mode

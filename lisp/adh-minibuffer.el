@@ -50,6 +50,7 @@
   :custom
   (completion-ignore-case t)
   (completion-styles '(orderless basic))
+  (completion-category-defaults nil)
   (completion-category-overrides '((file (styles orderless partial-completion))))
   :config
   (with-eval-after-load 'consult

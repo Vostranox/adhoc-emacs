@@ -89,6 +89,7 @@ When nil, use `adh-compile-config' to check and compile on demand."
 (defun adh-compile-config (&optional force)
   "Rebuild generated init.el, init.elc and package quickstart for next session.
 With a prefix argument FORCE, rebuild even when everything is up to date.
+When called interactively, show the build log as it is produced.
 Return the background build process, or nil if no rebuild is needed.
 If a build is already running, return that process."
   (interactive "P")
@@ -96,23 +97,31 @@ If a build is already running, return that process."
     (cond
      ((and proc (process-live-p proc))
       (when (called-interactively-p 'interactive)
-        (message "[adh] Configuration compilation is already running"))
-      proc)
+        (message "[adh] Configuration compilation is already running")))
      ((or force (adh--config-stale-p) (adh--package-quickstart-stale-p))
-      (adh--compile-config))
+      (setq proc (adh--compile-config)))
      (t
+      (setq proc nil)
       (when (called-interactively-p 'interactive)
-        (message "[adh] Compiled configuration is up to date"))
-      nil))))
+        (message "[adh] Compiled configuration is up to date"))))
+    (when (and proc (called-interactively-p 'interactive))
+      (display-buffer (process-buffer proc)))
+    proc))
 
 (defun adh--compile-config ()
   "Start a background build without removing the previous working init."
   (let ((dir (locate-user-emacs-file "lisp/")))
     (make-process
      :name "adh-compile-config"
-     :buffer (with-current-buffer (get-buffer-create " *adh-compile-config*")
-               (erase-buffer)
+     :buffer (with-current-buffer (get-buffer-create "*adh-compile-config*")
+               (let ((inhibit-read-only t))
+                 (erase-buffer))
+               (special-mode)
+               (setq-local window-point-insertion-type t)
+               (let ((inhibit-read-only t))
+                 (insert "[adh] Starting configuration build...\n"))
                (current-buffer))
+     :connection-type 'pipe
      :noquery t
      :command `(,(expand-file-name invocation-name invocation-directory)
                 "-Q" "--batch" "-L" ,dir
@@ -130,7 +139,7 @@ If a build is already running, return that process."
                  (unless (process-live-p proc)
                    (if (zerop (process-exit-status proc))
                        (message "[adh] Built init.el and init.elc")
-                     (display-warning 'adhoc "[adh][warning] Building init failed; see buffer \" *adh-compile-config*\"")))))))
+                     (display-warning 'adhoc "[adh][warning] Building init failed; see buffer \"*adh-compile-config*\"")))))))
 
 (defun adh--maybe-compile-config ()
   "Check and rebuild the configuration after startup when opted in."

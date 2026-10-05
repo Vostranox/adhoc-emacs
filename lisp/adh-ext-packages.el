@@ -4,6 +4,7 @@
 (require 'adh-functions)
 
 (defvar embark-exporters-alist)
+(defvar vr/engine)
 
 (defun adh-mc-keyboard-quit-dwim ()
   "Exit multiple-cursors if active, otherwise `adh-keyboard-quit-dwim'."
@@ -78,6 +79,14 @@
   (when (executable-find "zoxide")
     (zoxide-add)))
 
+(defun adh--vr-with-windows-shell (fn &rest args)
+  "Call FN with ARGS using cmdproxy for Visual Regexp's Python engine on Windows."
+  (if (and (eq system-type 'windows-nt) (eq vr/engine 'python))
+      (let ((shell-file-name (expand-file-name "cmdproxy.exe" exec-directory))
+            (shell-command-switch "/c"))
+        (apply fn args))
+    (apply fn args)))
+
 (use-package zoxide
   :ensure t
   :hook
@@ -143,7 +152,10 @@
   :ensure t :after visual-regexp
   :config
   (when (and (not (executable-find "python")) (executable-find "python3"))
-    (setq vr/command-python (replace-regexp-in-string "\\`python " "python3 " vr/command-python))))
+    (setq vr/command-python (replace-regexp-in-string "\\`python " "python3 " vr/command-python)))
+  ;; Wrap the package's legacy advice so quoting and execution share the shell.
+  (dolist (fn '(vr--feedback-function vr--get-replacements))
+    (advice-add fn :around #'adh--vr-with-windows-shell '((depth . -100)))))
 
 (use-package vundo
   :ensure t :defer t

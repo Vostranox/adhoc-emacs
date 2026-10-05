@@ -290,11 +290,6 @@ When it already runs there, rerun it in the directory it started from."
   (consult-customize consult-imenu consult-goto-line :preview-key 'any)
   (consult-customize consult-imenu-multi consult-goto-line :preview-key 'any))
 
-(use-package consult-flycheck
-  :ensure t :defer t
-  :config
-  (consult-customize consult-flycheck :keymap adh-consult-flycheck-map))
-
 (use-package embark
   :ensure t :defer t
   :custom

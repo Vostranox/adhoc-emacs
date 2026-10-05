@@ -102,12 +102,13 @@ LSP goes first, so servers are not restarted just before being shut down."
   (interactive)
   (adh--toggle-setting 'adh-flycheck-annotate "Diagnostic text"))
 
-(defun adh-toggle-flycheck-annotate-style ()
-  "Move the current line's inline diagnostic below the line or to its end."
-  (interactive)
-  (let ((style (if (eq adh-flycheck-annotate-style 'eol) 'below 'eol)))
-    (customize-set-variable 'adh-flycheck-annotate-style style)
-    (message "[adh] Inline diagnostics %s" style)))
+(defun adh-set-flycheck-annotate-style (style)
+  "Put the current line's inline diagnostic below the line or at its end per STYLE."
+  (interactive
+   (list (intern (completing-read "Diagnostic position: " '("below" "eol" "sideline")
+                                  nil t nil nil (symbol-name adh-flycheck-annotate-style)))))
+  (customize-set-variable 'adh-flycheck-annotate-style style)
+  (message "[adh] Diagnostic position: %s" style))
 
 (defun adh-toggle-lsp-format-on-save ()
   "Toggle formatting via LSP on save."
@@ -211,7 +212,7 @@ LSP goes first, so servers are not restarted just before being shut down."
              (customize-set-variable 'adh-mono-spaced-font-size height))
        :description (lambda () (adh--settings-gui-only (adh--settings-value "font size" 'adh-mono-spaced-font-size))))]
      ["Diagnostics" :if (lambda () (featurep 'adh-flycheck))
-      ("P" adh-toggle-flycheck-annotate-style
+      ("P" adh-set-flycheck-annotate-style
        :description (lambda () (adh--settings-value "position" 'adh-flycheck-annotate-style)))]])
 
   (transient-define-prefix adh-settings ()
