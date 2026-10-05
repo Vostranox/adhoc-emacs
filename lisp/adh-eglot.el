@@ -6,6 +6,9 @@
 (defvar eglot-server-programs)
 (defvar eglot-stay-out-of)
 
+(defvar adh--eglot-pending-servers nil
+  "Server registrations to apply when Eglot loads, newest first.")
+
 (defvar adh--eglot-global-enabled nil
   "Non-nil when eglot auto-starts in supported `prog-mode' buffers.")
 
@@ -17,8 +20,6 @@
 (defun adh--eglot-release-buffer (buf features)
   "Undo eglot's setup for FEATURES in BUF."
   (with-current-buffer buf
-    (when (memq 'flymake features)
-      (flymake-mode -1))
     (when (memq 'eldoc features)
       (dolist (f eldoc-documentation-functions)
         (when (and (symbolp f) (string-prefix-p "eglot-" (symbol-name f)))
@@ -51,7 +52,7 @@
   "Derive `eglot-stay-out-of' from the settings; reconnect servers on change."
   (let* ((old (bound-and-true-p eglot-stay-out-of))
          (new (append (seq-difference old '(flymake eldoc yas))
-                      (unless adh-lsp-diagnostics '(flymake))
+                      '(flymake)
                       (unless (eq adh-completion-style 'full) '(eldoc yas))))
          (released (seq-difference new old))
          (bufs (unless (seq-set-equal-p old new) (adh--eglot-managed-buffers))))
@@ -88,7 +89,7 @@
          (setq adh--eglot-global-enabled nil)
          (remove-hook 'prog-mode-hook #'adh--eglot-ensure-if-supported)
          (let ((bufs (adh--eglot-managed-buffers))
-               (handled (seq-difference '(flymake eldoc yas) eglot-stay-out-of)))
+               (handled (seq-difference '(eldoc yas) eglot-stay-out-of)))
            (let ((inhibit-message t))
              (eglot-shutdown-all))
            (dolist (buf bufs)
@@ -110,23 +111,22 @@
     (remove-hook 'before-save-hook #'adh--eglot-format-safe)))
 
 (defun adh-register-lsp-server (mode program &rest args)
-  "Tell eglot to run PROGRAM (with ARGS) as the LSP server for major MODE."
-  (let ((cmd-list (cons program args)))
-    (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs (cons mode cmd-list)))))
-
-(defun adh-flymake-display-diagnostic ()
-  "Show the flymake diagnostic at point without leaving the current window."
-  (interactive)
-  (adh--with-saved-window #'flymake-goto-diagnostic))
+  "Tell Eglot to run PROGRAM with ARGS for MODE, a mode symbol or list."
+  (let ((servers (if (featurep 'eglot) 'eglot-server-programs 'adh--eglot-pending-servers)))
+    (set servers (cons (cons mode (cons program args))
+                       (assoc-delete-all mode (symbol-value servers) #'equal)))))
 
 (use-package eglot
   :ensure nil :defer 10
+  :init
+  (adh-register-lsp-server '(c-ts-mode c++-ts-mode) "clangd" "--header-insertion=never")
   :config
+  (dolist (entry (reverse adh--eglot-pending-servers))
+    (apply #'adh-register-lsp-server (car entry) (cdr entry)))
+  (setq adh--eglot-pending-servers nil)
   (add-to-list 'eglot-ignored-server-capabilities :inlayHintProvider)
   (add-to-list 'eglot-ignored-server-capabilities :semanticTokensProvider)
-  (add-to-list 'eglot-ignored-server-capabilities :documentOnTypeFormattingProvider)
-  (adh-register-lsp-server '(c-ts-mode c++-ts-mode) "clangd" "--header-insertion=never"))
+  (add-to-list 'eglot-ignored-server-capabilities :documentOnTypeFormattingProvider))
 
 (adh--lsp-set-format-on-save adh-lsp-format-on-save)
 (adh--eglot-sync)

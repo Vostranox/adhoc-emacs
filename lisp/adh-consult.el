@@ -7,7 +7,7 @@
 (defvar adh--imenu-items nil
   "Items that the last consult-imenu prompt offered.")
 
-(defvar-keymap adh-consult-flymake-map)
+(defvar-keymap adh-consult-flycheck-map)
 
 (defun adh--imenu-marker (pos)
   (pcase pos
@@ -108,11 +108,11 @@ When it already runs there, rerun it in the directory it started from."
                       (buffer-substring-no-properties (region-beginning) (region-end))
                     initial)))
 
-(defun adh-consult-flymake-show-buffer-diagnostics ()
-  "Quit `consult-flymake' and list the buffer's Flymake diagnostics."
+(defun adh-consult-flycheck-show-buffer-diagnostics ()
+  "Quit `consult-flycheck' and list the buffer's Flycheck diagnostics."
   (interactive)
   (let ((buf (window-buffer (minibuffer-selected-window))))
-    (run-at-time 0 nil (lambda () (with-current-buffer buf (flymake-show-buffer-diagnostics))))
+    (run-at-time 0 nil (lambda () (with-current-buffer buf (flycheck-list-errors))))
     (minibuffer-quit-recursive-edit)))
 
 (defun adh--imenu-remember-items (_prompt items)
@@ -287,9 +287,13 @@ When it already runs there, rerun it in the directory it started from."
     (_
      (setq consult-locate-args "locate -i -r")))
 
-  (consult-customize consult-flymake :keymap adh-consult-flymake-map)
   (consult-customize consult-imenu consult-goto-line :preview-key 'any)
   (consult-customize consult-imenu-multi consult-goto-line :preview-key 'any))
+
+(use-package consult-flycheck
+  :ensure t :defer t
+  :config
+  (consult-customize consult-flycheck :keymap adh-consult-flycheck-map))
 
 (use-package embark
   :ensure t :defer t

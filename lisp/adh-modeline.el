@@ -2,6 +2,12 @@
 
 (require 'adh-functions)
 
+(defvar flycheck-current-errors)
+(defvar flycheck-last-status-change)
+(defvar flycheck-mode-line-counts-map)
+(defvar flycheck-mode-line-prefix)
+(defvar flycheck-mode-line-color)
+
 (defvar adh--ml-bg       "#181818")
 (defvar adh--ml-isle     "#1f1f1f")
 (defvar adh--ml-pill     "#282828")
@@ -389,7 +395,7 @@ A Dired buffer shows the name of its directory instead."
     ('unmanaged (adh--ml-lsp-button adh--ml-inactive))))
 
 (defconst adh--ml-minors-excluded
-  '(flymake-mode
+  '(flycheck-mode
     meow-normal-mode meow-insert-mode meow-motion-mode
     completion-preview-mode)
   "Minor modes that have a segment of their own, or none worth showing.")
@@ -475,34 +481,41 @@ The count toggles the list; a lighter opens its mode's menu."
                                  'local-map adh--ml-minor-mode-map))
                    modes " ")))))))
 
-(defun adh--segment-flymake ()
-  "Return flymake's non-zero counters, or a check mark when clean."
-  (when (bound-and-true-p flymake-mode)
-    (let* ((s (format-mode-line 'flymake-mode-line-counters))
-           (n (length s))
-           (i 0)
-           all)
-      (while (< i n)
-        (let ((next (or (next-single-property-change i 'flymake--diagnostic-type s) n)))
-          (when (get-text-property i 'flymake--diagnostic-type s)
-            (push (substring s i next) all))
-          (setq i next)))
-      (setq all (nreverse all))
-      (when all
-        (let ((nonzero (remove "0" all)))
-          (if nonzero
-              (mapconcat #'identity nonzero
-                         (propertize "·" 'face `(:foreground ,adh--ml-faint)))
-            (let ((tick (apply #'propertize "✓"
-                               (text-properties-at 0 (car all)))))
-              (add-face-text-property 0 1 `(:foreground ,adh--ml-muted) nil tick)
-              (put-text-property 0 1 'help-echo "No diagnostics.\nmouse-1: list" tick)
-              tick)))))))
+(defun adh--segment-flycheck ()
+  "Return Flycheck's non-zero counters, clean check mark or checking status."
+  (when (bound-and-true-p flycheck-mode)
+    (if (eq flycheck-last-status-change 'finished)
+        (let ((counts (flycheck-count-errors flycheck-current-errors))
+              parts)
+          (dolist (level '(error warning info))
+            (when-let* ((count (alist-get level counts))
+                        ((> count 0)))
+              (push (propertize (number-to-string count)
+                                'face (flycheck-error-level-error-list-face level))
+                    parts)))
+          (propertize
+           (if parts
+               (mapconcat #'identity (nreverse parts)
+                          (propertize "·" 'face `(:foreground ,adh--ml-faint)))
+             (propertize "✓" 'face `(:foreground ,adh--ml-muted)))
+           'local-map flycheck-mode-line-counts-map
+           'mouse-face 'mode-line-highlight
+           'help-echo (format "%d errors, %d warnings, %d notes.\nmouse-1: list"
+                              (or (alist-get 'error counts) 0)
+                              (or (alist-get 'warning counts) 0)
+                              (or (alist-get 'info counts) 0))))
+      (let* ((flycheck-mode-line-prefix "")
+             (flycheck-mode-line-color nil)
+             (status (string-trim (flycheck-mode-line-status-text))))
+        (unless (string-empty-p status)
+          (adh--ml-tint status (if (memq flycheck-last-status-change '(errored suspicious))
+                                   adh--ml-warn
+                                 adh--ml-muted)))))))
 
 (defun adh--segment-tooling ()
-  "Return the LSP state and flymake counters together, or nil."
+  "Return the LSP state and Flycheck counters together, or nil."
   (let ((lsp (adh--segment-lsp))
-        (fly (adh--segment-flymake)))
+        (fly (adh--segment-flycheck)))
     (cond ((and lsp fly)
            (concat lsp
                    (propertize ":" 'face `(:foreground ,adh--ml-fg))

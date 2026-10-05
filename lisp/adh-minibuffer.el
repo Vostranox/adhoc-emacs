@@ -1,6 +1,23 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(require 'adh-vars)
+
 (defvar consult--tofu-regexp)
+(defvar vertico-multiform-categories)
+
+(defun adh--apply-vertico-style (style)
+  "Use STYLE for minibuffer completion without a more specific layout."
+  (setq vertico-multiform-categories
+        (append (assq-delete-all t (copy-sequence vertico-multiform-categories))
+                (list (if (eq style 'vertical) '(t) (list t style))))))
+
+(defun adh-set-vertico-style (style)
+  "Set the default Vertico layout to STYLE for this session."
+  (interactive
+   (list (intern (completing-read "Vertico layout: " '("flat" "vertical" "grid" "reverse" "buffer")
+                                  nil t nil nil (symbol-name adh-vertico-style)))))
+  (customize-set-variable 'adh-vertico-style style)
+  (message "[adh] Vertico layout: %s" style))
 
 (defun adh--orderless-dollar-tofu-dispatcher (pattern _index _total)
   "Make a trailing \"$\" in PATTERN tolerate consult's tofu suffix char."
@@ -15,10 +32,11 @@
   :custom
   (vertico-resize 'grow-only)
   (vertico-flat-max-lines 3)
-  (vertico-multiform-categories '((t flat)))
-  (vertico-multiform-commands '((consult-flymake)))
+  (vertico-multiform-commands '((consult-flycheck)))
   (vertico-buffer-display-action
    '(display-buffer-same-window (inhibit-same-window . nil) (body-function . (lambda (win) (delete-other-windows win)))))
+  :config
+  (adh--apply-vertico-style adh-vertico-style)
   :hook
   (rfn-eshadow-update-overlay . vertico-directory-tidy))
 

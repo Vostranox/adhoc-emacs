@@ -118,8 +118,11 @@
   (org-mode . org-indent-mode))
 
 (use-package savehist
+  :init
+  (put 'command-history 'history-length 100)
   :config
-  (savehist-mode 1))
+  (savehist-mode 1)
+  (setq command-history (seq-take command-history 100)))
 
 (use-package recentf
   :functions recentf-cleanup
@@ -127,6 +130,7 @@
   (recentf-exclude '("^/tmp"))
   (recentf-max-saved-items 5000)
   (recentf-auto-cleanup 'never)
+  (recentf-show-messages nil)
   :config
   (recentf-mode 1)
   (add-hook 'after-init-hook

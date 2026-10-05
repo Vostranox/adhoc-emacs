@@ -11,8 +11,9 @@
 (defvar git-commit-mode-map)
 (defvar git-rebase-mode-map)
 (defvar ibuffer-mode-map)
-(defvar adh-consult-flymake-map)
+(defvar adh-consult-flycheck-map)
 (defvar ediff-mode-map)
+(defvar electric-pair-mode-map)
 
 (declare-function dirvish-subtree--expanded-p "dirvish-subtree")
 
@@ -106,7 +107,7 @@
 (keymap-set global-map "C-x RET o" #'adh-show-buffer-file-encoding)
 
 ;; M-g
-(keymap-set global-map "M-g f" #'consult-flymake)
+(keymap-set global-map "M-g f" #'consult-flycheck)
 (keymap-set global-map "M-g i" #'consult-imenu-multi)
 
 ;;; minibuffer map
@@ -136,7 +137,7 @@
   "M-d" #'adh-shell-command-dir-pivot
   "M-." #'adh-shell-command-root-pivot)
 
-(keymap-set adh-consult-flymake-map "M-a" #'adh-consult-flymake-show-buffer-diagnostics)
+(keymap-set adh-consult-flycheck-map "M-a" #'adh-consult-flycheck-show-buffer-diagnostics)
 
 ;;; leader map
 
@@ -436,11 +437,18 @@
     "," #'next-error-no-select
     "l" #'clipboard-kill-ring-save))
 
-(with-eval-after-load 'flymake
-  (define-keymap :keymap flymake-diagnostics-buffer-mode-map
-    "<backspace>" #'adh-flymake-display-diagnostic
-    "." #'previous-error-this-buffer-no-select
-    "," #'next-error-this-buffer-no-select))
+(with-eval-after-load 'flycheck
+  (define-keymap :keymap flycheck-error-list-mode-map
+    "<backspace>" #'adh-flycheck-display-diagnostic
+    "." #'flycheck-error-list-previous-error
+    "," #'flycheck-error-list-next-error))
+
+(with-eval-after-load 'elec-pair
+  (keymap-set electric-pair-mode-map "<backspace>"
+              '(menu-item "" electric-pair-delete-pair
+                          :filter (lambda (_)
+                                    (unless (use-region-p)
+                                      (keymap-lookup electric-pair-mode-map "DEL"))))))
 
 (with-eval-after-load 'grep
   (define-keymap :keymap grep-mode-map

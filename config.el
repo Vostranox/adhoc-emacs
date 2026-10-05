@@ -13,6 +13,7 @@
 (adh-require! 'adh-core-packages)
 (adh-require! 'adh-project)
 (adh-require! 'adh-eglot)
+(adh-require! 'adh-flycheck)
 (adh-require! 'adh-ext-packages)
 (adh-require! 'adh-completion)
 (adh-require! 'adh-settings)
@@ -22,7 +23,7 @@
 (adh-require! 'adh-magit)
 (adh-require! 'adh-modeline)
 (when (and adh-use-custom-keybinds
-           (adh-keybinds-need! '(adh-core-packages adh-project adh-eglot adh-ext-packages
+           (adh-keybinds-need! '(adh-core-packages adh-project adh-flycheck adh-ext-packages
                                  adh-completion adh-settings adh-consult adh-magit)))
   (adh-require! 'adh-meow)
   (adh-require! 'adh-keybinds))

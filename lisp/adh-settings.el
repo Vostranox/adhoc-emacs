@@ -7,7 +7,9 @@
 (require 'adh-startup)
 
 (defconst adh--settings-options
-  '(adh-completion-style adh-completion-ui adh-completion-keys adh-use-lsp adh-use-vc adh-subwords adh-use-which-key adh-lsp-diagnostics
+  '(adh-completion-style adh-completion-ui adh-completion-keys adh-vertico-style
+    adh-use-lsp adh-use-vc adh-subwords adh-use-electric-pair adh-use-which-key adh-use-flycheck
+    adh-flycheck-annotate adh-flycheck-annotate-style
     adh-lsp-format-on-save adh-use-dirvish adh-window-decoration adh-frame-opacity
     adh-list-max-height adh-mono-spaced-font adh-mono-spaced-font-size adh-auto-compile-config)
   "Options the settings menu shows and saves.")
@@ -90,10 +92,22 @@ LSP goes first, so servers are not restarted just before being shut down."
   (interactive)
   (adh--toggle-setting 'adh-use-lsp "LSP"))
 
-(defun adh-toggle-lsp-diagnostics ()
-  "Toggle LSP diagnostics in flymake."
+(defun adh-toggle-flycheck ()
+  "Toggle Flycheck diagnostics and Eglot integration."
   (interactive)
-  (adh--toggle-setting 'adh-lsp-diagnostics "LSP diagnostics"))
+  (adh--toggle-setting 'adh-use-flycheck "Flycheck"))
+
+(defun adh-toggle-flycheck-annotate ()
+  "Toggle Flycheck diagnostic text shown beside or below the code."
+  (interactive)
+  (adh--toggle-setting 'adh-flycheck-annotate "Diagnostic text"))
+
+(defun adh-toggle-flycheck-annotate-style ()
+  "Move the current line's inline diagnostic below the line or to its end."
+  (interactive)
+  (let ((style (if (eq adh-flycheck-annotate-style 'eol) 'below 'eol)))
+    (customize-set-variable 'adh-flycheck-annotate-style style)
+    (message "[adh] Inline diagnostics %s" style)))
 
 (defun adh-toggle-lsp-format-on-save ()
   "Toggle formatting via LSP on save."
@@ -109,6 +123,11 @@ LSP goes first, so servers are not restarted just before being shut down."
   "Toggle subword motion and display."
   (interactive)
   (adh--toggle-setting 'adh-subwords "Subwords"))
+
+(defun adh-toggle-electric-pair ()
+  "Toggle automatic matching brackets and quotes."
+  (interactive)
+  (adh--toggle-setting 'adh-use-electric-pair "Auto pairs"))
 
 (defun adh-toggle-which-key ()
   "Toggle the which-key list of keys that follow a prefix."
@@ -137,8 +156,8 @@ LSP goes first, so servers are not restarted just before being shut down."
   (call-interactively #'adh-settings))
 
 (with-eval-after-load 'transient
-  (transient-define-prefix adh-settings ()
-    "Change AdHoc settings; S saves them for the next start."
+  (transient-define-prefix adh-settings-completion ()
+    "Choose completion behavior and layout; C-g returns to settings."
     :transient-suffix t
     [["Completion" :if (lambda () (featurep 'adh-completion))
       ("n" (lambda () (interactive) (customize-set-variable 'adh-completion-style 'none))
@@ -162,29 +181,16 @@ LSP goes first, so servers are not restarted just before being shut down."
       ("i" (lambda () (interactive) (customize-set-variable 'adh-completion-keys 'tab-only))
        :description (lambda () (adh--settings-choice 'adh-completion-keys 'tab-only)))
       ("e" (lambda () (interactive) (customize-set-variable 'adh-completion-keys 'tab-and-enter))
-       :description (lambda () (adh--settings-choice 'adh-completion-keys 'tab-and-enter)))]
-     ["LSP" :if (lambda () (featurep 'adh-eglot))
-      ("l" adh-toggle-lsp
-       :description (lambda () (adh--settings-switch "servers" 'adh-use-lsp)))
-      ("d" adh-toggle-lsp-diagnostics
-       :description (lambda () (adh--settings-switch "diagnostics" 'adh-lsp-diagnostics)))
-      ("s" adh-toggle-lsp-format-on-save
-       :description (lambda () (adh--settings-switch "format on save" 'adh-lsp-format-on-save)))]
-     ["VC" :if (lambda () (featurep 'adh-core-packages))
-      ("g" adh-toggle-vc
-       :description (lambda () (adh--settings-switch "vc" 'adh-use-vc)))]
-     ["Display"
-      ("k" adh-toggle-subwords
-       :description (lambda () (adh--settings-switch "subwords" 'adh-subwords))
-       :if (lambda () (featurep 'adh-core-packages)))
-      ("W" adh-toggle-which-key
-       :description (lambda () (adh--settings-switch "which-key" 'adh-use-which-key))
-       :if (lambda () (featurep 'adh-core-packages)))
-      ("r" adh-toggle-dirvish
-       :description (lambda () (adh--settings-switch "dirvish" 'adh-use-dirvish))
-       :if (lambda () (featurep 'adh-ext-packages)))
-      ("w" adh-toggle-window-decoration
-       :description (lambda () (adh--settings-gui-only (adh--settings-switch "window decorations" 'adh-window-decoration))))
+       :description (lambda () (adh--settings-choice 'adh-completion-keys 'tab-and-enter)))]]
+    ["Minibuffer"
+     ("V" adh-set-vertico-style
+      :description (lambda () (adh--settings-value "vertico" 'adh-vertico-style))
+      :if (lambda () (featurep 'adh-minibuffer)))])
+
+  (transient-define-prefix adh-settings-display ()
+    "Change appearance and diagnostic position; C-g returns to settings."
+    :transient-suffix t
+    [["Appearance"
       ("o" (lambda (opacity)
              (interactive (list (adh--settings-read-integer "Opacity (0-100): "
                                                             adh-frame-opacity 0 100)))
@@ -203,7 +209,49 @@ LSP goes first, so servers are not restarted just before being shut down."
              (interactive (list (adh--settings-read-integer "Font size (1/10 pt): "
                                                             adh-mono-spaced-font-size 1)))
              (customize-set-variable 'adh-mono-spaced-font-size height))
-       :description (lambda () (adh--settings-gui-only (adh--settings-value "font size" 'adh-mono-spaced-font-size))))]]
+       :description (lambda () (adh--settings-gui-only (adh--settings-value "font size" 'adh-mono-spaced-font-size))))]
+     ["Diagnostics" :if (lambda () (featurep 'adh-flycheck))
+      ("P" adh-toggle-flycheck-annotate-style
+       :description (lambda () (adh--settings-value "position" 'adh-flycheck-annotate-style)))]])
+
+  (transient-define-prefix adh-settings ()
+    "Change AdHoc settings; S saves them for the next start."
+    :transient-suffix t
+    [["Code tools" :if (lambda () (or (featurep 'adh-eglot) (featurep 'adh-flycheck)))
+      ("l" adh-toggle-lsp
+       :description (lambda () (adh--settings-switch "lsp" 'adh-use-lsp))
+       :if (lambda () (featurep 'adh-eglot)))
+      ("d" adh-toggle-flycheck
+       :description (lambda () (adh--settings-switch "diagnostic" 'adh-use-flycheck))
+       :if (lambda () (featurep 'adh-flycheck)))
+      ("A" adh-toggle-flycheck-annotate
+       :description (lambda () (adh--settings-switch "inline diagnostic" 'adh-flycheck-annotate))
+       :if (lambda () (featurep 'adh-flycheck)))
+      ("s" adh-toggle-lsp-format-on-save
+       :description (lambda () (adh--settings-switch "format on save" 'adh-lsp-format-on-save))
+       :if (lambda () (featurep 'adh-eglot)))]
+     ["Editing"
+      ("g" adh-toggle-vc
+       :description (lambda () (adh--settings-switch "vc" 'adh-use-vc))
+       :if (lambda () (featurep 'adh-core-packages)))
+      ("k" adh-toggle-subwords
+       :description (lambda () (adh--settings-switch "subwords" 'adh-subwords))
+       :if (lambda () (featurep 'adh-core-packages)))
+      ("p" adh-toggle-electric-pair
+       :description (lambda () (adh--settings-switch "auto pairs" 'adh-use-electric-pair))
+       :if (lambda () (featurep 'adh-emacs)))
+      ("W" adh-toggle-which-key
+       :description (lambda () (adh--settings-switch "which-key" 'adh-use-which-key))
+       :if (lambda () (featurep 'adh-core-packages)))
+      ("r" adh-toggle-dirvish
+       :description (lambda () (adh--settings-switch "dirvish" 'adh-use-dirvish))
+       :if (lambda () (featurep 'adh-ext-packages)))
+      ("w" adh-toggle-window-decoration
+       :description (lambda () (adh--settings-gui-only (adh--settings-switch "window decorations" 'adh-window-decoration))))]
+     ["Options"
+      ("c" "completion..." adh-settings-completion :transient t
+       :if (lambda () (or (featurep 'adh-completion) (featurep 'adh-minibuffer))))
+      ("v" "display..." adh-settings-display :transient t)]]
     ["Startup"
      ("C" adh-toggle-auto-compile-config
       :description (lambda () (adh--settings-switch "auto compile" 'adh-auto-compile-config)))]

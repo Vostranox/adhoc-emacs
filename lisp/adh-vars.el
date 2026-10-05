@@ -62,6 +62,18 @@
   :initialize #'custom-initialize-default
   :set (adh--custom-setter 'adh--apply-completion-keys))
 
+(defcustom adh-vertico-style 'flat
+  "Default layout for minibuffer completion.
+Command-specific Vertico layouts take precedence."
+  :group 'adhoc
+  :type '(choice (const :tag "Flat list" flat)
+                 (const :tag "Vertical list" vertical)
+                 (const :tag "Grid" grid)
+                 (const :tag "Reverse list" reverse)
+                 (const :tag "Full-buffer list" buffer))
+  :initialize #'custom-initialize-default
+  :set (adh--custom-setter 'adh--apply-vertico-style))
+
 (defcustom adh-use-lsp nil
   "When non-nil, start eglot in every buffer with a known LSP server."
   :group 'adhoc
@@ -69,12 +81,27 @@
   :initialize #'custom-initialize-default
   :set (adh--custom-setter 'adh--lsp-set-autostart))
 
-(defcustom adh-lsp-diagnostics nil
-  "When non-nil, eglot feeds the LSP server's diagnostics to flymake."
+(defcustom adh-use-flycheck nil
+  "When non-nil, enable Flycheck and its Eglot bridge."
   :group 'adhoc
   :type 'boolean
   :initialize #'custom-initialize-default
-  :set (adh--custom-setter 'adh--eglot-sync))
+  :set (adh--custom-setter 'adh--apply-flycheck))
+
+(defcustom adh-flycheck-annotate t
+  "When non-nil, show inline diagnostics when Flycheck is enabled."
+  :group 'adhoc
+  :type 'boolean
+  :initialize #'custom-initialize-default
+  :set (adh--custom-setter 'adh--apply-flycheck-annotate))
+
+(defcustom adh-flycheck-annotate-style 'below
+  "Where the current line's inline diagnostic goes."
+  :group 'adhoc
+  :type '(choice (const :tag "Below the line" below)
+                 (const :tag "End of the line" eol))
+  :initialize #'custom-initialize-default
+  :set (adh--custom-setter 'adh--apply-flycheck-annotate-style))
 
 (defcustom adh-lsp-format-on-save nil
   "When non-nil, eglot formats managed buffers on save."
@@ -96,6 +123,13 @@
   :type 'boolean
   :initialize #'custom-initialize-default
   :set (adh--custom-setter 'adh--apply-subwords))
+
+(defcustom adh-use-electric-pair nil
+  "When non-nil, automatically insert matching brackets and quotes."
+  :group 'adhoc
+  :type 'boolean
+  :initialize #'custom-initialize-default
+  :set (adh--custom-setter 'adh--apply-electric-pair))
 
 (defcustom adh-use-which-key nil
   "When non-nil, list the keys that can follow a prefix key (which-key)."
@@ -167,7 +201,7 @@ Other grammars are installed the first time a file needs them."
     "\\*Embark Export" "^\\*e: " "\\*eldoc"
     help-mode apropos-mode messages-buffer-mode backtrace-mode
     compilation-mode comint-mode occur-mode xref--xref-buffer-mode
-    flymake-diagnostics-buffer-mode flymake-project-diagnostics-mode
+    flycheck-error-list-mode flycheck-error-message-mode
     embark-collect-mode)
   "Buffer name regexps or major modes shown in the bottom popup.
 A mode also matches its derived modes."

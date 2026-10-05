@@ -5,6 +5,11 @@
 
 (defvar ns-use-proxy-icon)
 
+(defun adh--apply-electric-pair (on)
+  "Enable automatic matching brackets and quotes when ON is non-nil."
+  (when (or on (bound-and-true-p electric-pair-mode))
+    (electric-pair-mode (if on 1 -1))))
+
 (defun adh--create-parent-dir-on-the-fly ()
   "Create a missing parent directory for the visited file."
   (let ((dir (file-name-directory buffer-file-name)))
@@ -149,12 +154,13 @@
         (lambda (_window buf _bury-or-kill) (not (adh--buffer-listable-p buf))))
 
   (delete-selection-mode 1)
+  (adh--apply-electric-pair adh-use-electric-pair)
   (global-display-line-numbers-mode 1)
   (global-hl-line-mode 1)
   (global-whitespace-mode 1)
   (minibuffer-depth-indicate-mode 1)
   (window-divider-mode 1)
-  (winner-mode 1)
+  (tab-bar-history-mode 1)
   :hook
   (emacs-startup . (lambda () (tab-bar-rename-tab "dev") (message "[adh] Activated %d packages in %s" (length package-activated-list) (emacs-init-time))))
   (find-file-not-found-functions . adh--create-parent-dir-on-the-fly)
