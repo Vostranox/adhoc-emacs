@@ -1,9 +1,58 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-(require 'adh-vars)
+(require 'adh-options)
 (require 'adh-functions)
 
 (defvar ns-use-proxy-icon)
+
+(defvar vertico-count)
+
+(defun adh--apply-font (family height &optional frame)
+  "Set the default face to FAMILY at HEIGHT if FRAME can display it.
+Return nil on a terminal or if the font is missing."
+  (when (and (display-graphic-p frame)
+             (find-font (font-spec :family family) frame))
+    (set-face-attribute 'default nil :family family :height height)
+    (set-face-attribute 'fixed-pitch nil :family family)
+    t))
+
+(defun adh--apply-frame-parameter (parameter value)
+  "Set frame PARAMETER to VALUE for all current and future frames."
+  (modify-all-frames-parameters (list (cons parameter value))))
+
+(defun adh--apply-window-decoration (decorated)
+  "Show or hide the window-manager frame decorations per DECORATED."
+  (adh--apply-frame-parameter 'undecorated (not decorated)))
+
+(defun adh--apply-frame-opacity (opacity)
+  "Set frame OPACITY (0-100); background only, except on Windows and macOS."
+  (adh--apply-frame-parameter
+   (if (memq system-type '(windows-nt darwin)) 'alpha 'alpha-background)
+   opacity)
+  (force-mode-line-update t))
+
+(defun adh--apply-list-max-height (lines)
+  "Show at most LINES lines in vertico, the *Completions* list and popups."
+  (setq vertico-count lines
+        completions-max-height lines))
+
+(defun adh--apply-queued-font (frame)
+  "Apply `adh-mono-spaced-font' to new FRAME, unhooking once it succeeds."
+  (cond ((adh--apply-font adh-mono-spaced-font adh-mono-spaced-font-size frame)
+         (remove-hook 'after-make-frame-functions #'adh--apply-queued-font))
+        ((display-graphic-p frame)
+         (message "[adh] Warning: Queued font '%s' not found." adh-mono-spaced-font))))
+
+(defun adh--apply-font-settings (&rest _)
+  "Apply `adh-mono-spaced-font' and its size, also to future frames."
+  (if (adh--apply-font adh-mono-spaced-font adh-mono-spaced-font-size)
+      (progn
+        (remove-hook 'after-make-frame-functions #'adh--apply-queued-font)
+        (message "[adh] Set font '%s'" adh-mono-spaced-font))
+    (add-hook 'after-make-frame-functions #'adh--apply-queued-font)
+    (if (display-graphic-p)
+        (message "[adh] Font not found: '%s'" adh-mono-spaced-font)
+      (message "[adh] Queued font '%s'" adh-mono-spaced-font))))
 
 (defun adh--apply-electric-pair (on)
   "Enable automatic matching brackets and quotes when ON is non-nil."
@@ -16,6 +65,13 @@
     (when (and dir (not (file-exists-p dir)))
       (make-directory dir t)))
   nil)
+
+(defun adh--completions-preselect-first ()
+  "Treat the first *Completions* candidate as selected."
+  (with-current-buffer standard-output
+    (when (get-text-property (point-min) 'mouse-face)
+      (let ((inhibit-read-only t))
+        (put-text-property (point-min) (1+ (point-min)) 'first-completion t)))))
 
 (define-advice forward-sexp (:around (orig &rest args) adh-syntax-only)
   (let ((forward-sexp-function nil))
@@ -56,9 +112,6 @@
 
   (c-basic-offset 4)
   (c-default-style "bsd")
-  (c-ts-indent-offset 4)
-  (c-ts-mode-indent-style 'bsd)
-  (go-ts-indent-offset 4)
 
   (compile-command "")
   (compilation-scroll-output t)
@@ -172,3 +225,5 @@
   (before-save . delete-trailing-whitespace))
 
 (provide 'adh-emacs)
+
+;;; adh-emacs.el ends here

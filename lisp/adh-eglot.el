@@ -1,6 +1,6 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-(require 'adh-vars)
+(require 'adh-options)
 (require 'adh-functions)
 
 (defvar eglot-server-programs)
@@ -133,3 +133,5 @@
 (adh--lsp-set-autostart adh-use-lsp)
 
 (provide 'adh-eglot)
+
+;;; adh-eglot.el ends here

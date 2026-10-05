@@ -24,7 +24,9 @@
   "Non-nil while `adh-magit-show-commit-original' runs.")
 
 (defun adh--magit-show-commit-current-file (fn rev &optional args files module)
-  "Advice for `magit-show-commit': limit the diff to the blamed file."
+  "Call FN for REV with ARGS, FILES and MODULE, limiting the diff during blame.
+In a blame buffer, replace FILES with the blamed file, or nil when
+`adh--magit-show-full-commit' requests the whole commit."
   (when-let* ((chunk (and (bound-and-true-p magit-blame-mode) (magit-current-blame-chunk))))
     (setq files (unless adh--magit-show-full-commit (list (oref chunk orig-file)))))
   (funcall fn rev args files module))
@@ -202,3 +204,5 @@ With a prefix argument OTHER-WINDOW, display the buffer in another window."
     '("!" "Run in each module" adh-magit-submodule-foreach)))
 
 (provide 'adh-magit)
+
+;;; adh-magit.el ends here

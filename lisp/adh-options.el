@@ -217,4 +217,6 @@ A mode also matches its derived modes."
   :initialize #'custom-initialize-default
   :set (adh--custom-setter 'adh--apply-list-max-height))
 
-(provide 'adh-vars)
+(provide 'adh-options)
+
+;;; adh-options.el ends here

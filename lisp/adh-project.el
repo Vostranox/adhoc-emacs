@@ -2,6 +2,9 @@
 
 (require 'adh-functions)
 
+(defvar adh--shell-prompt-dir nil
+  "When set, adh labels compile and shell prompts with this directory.")
+
 (declare-function project-try-vc "project" (dir))
 
 (defun adh--project-try (&optional dir)
@@ -25,6 +28,40 @@
             (delete-minibuffer-contents)
             (insert region)))
       (call-interactively command))))
+
+(defun adh-shell-command-dir-pivot (&optional dir)
+  "Rerun the current compile or shell command prompt in DIR, or one read."
+  (interactive)
+  (let ((input (minibuffer-contents-no-properties))
+        (origin (adh--origin-dir))
+        (command (pcase (minibuffer-prompt)
+                   ((rx bos "Compile" (or " command: " " (")) #'compile)
+                   ((rx bos "Async shell" (or " command: " " command in " " (")) #'async-shell-command)
+                   ((rx bos "Shell" (or " command: " " command in " " (")) #'shell-command)
+                   (_ (user-error "No directory pivot for this prompt")))))
+    (adh--minibuffer-pivot-call
+     (lambda ()
+       (let* ((adh--command-origin-dir origin)
+              (default-directory (or dir
+                                     (let ((use-dialog-box nil))
+                                       (expand-file-name (read-directory-name "Run in: " origin nil t)))))
+              (adh--shell-prompt-dir default-directory))
+         (minibuffer-with-setup-hook
+             (lambda ()
+               (delete-minibuffer-contents)
+               (insert input))
+           (call-interactively command)))))))
+
+(defun adh-shell-command-root-pivot ()
+  "Rerun the current compile or shell command prompt at the project root.
+When it already runs there, rerun it in the directory it started from."
+  (interactive)
+  (let* ((origin (adh--origin-dir))
+         (root (adh--get-project-dir origin))
+         (dir (if (and root (not (file-equal-p default-directory root))) root origin)))
+    (if (file-equal-p dir default-directory)
+        (user-error (if root "Already at the project root" "Not in a project"))
+      (adh-shell-command-dir-pivot dir))))
 
 (defun adh-compile-region ()
   "Compile from `default-directory', starting with the active region."
@@ -70,3 +107,5 @@
   (cl-defmethod project-external-roots ((_project (head vc))) nil))
 
 (provide 'adh-project)
+
+;;; adh-project.el ends here

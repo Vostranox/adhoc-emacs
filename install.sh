@@ -41,7 +41,7 @@ else
     emacs --batch --eval "(progn
         (when (featurep 'native-compile)
           (startup-redirect-eln-cache \"$EMACS_DIR/var/eln-cache/\"))
-        (load \"$EMACS_DIR/lisp/adh-vars.el\")
+        (load \"$EMACS_DIR/lisp/adh-options.el\")
         (with-demoted-errors \"[adh][error] adh-custom-pre-init.el: %S\"
           (load \"$EMACS_DIR/adh-custom-pre-init.el\" t))
         (require 'package)

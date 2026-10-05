@@ -102,14 +102,6 @@ LSP goes first, so servers are not restarted just before being shut down."
   (interactive)
   (adh--toggle-setting 'adh-flycheck-annotate "Diagnostic text"))
 
-(defun adh-set-flycheck-annotate-style (style)
-  "Put the current line's inline diagnostic below the line or at its end per STYLE."
-  (interactive
-   (list (intern (completing-read "Diagnostic position: " '("below" "eol" "sideline")
-                                  nil t nil nil (symbol-name adh-flycheck-annotate-style)))))
-  (customize-set-variable 'adh-flycheck-annotate-style style)
-  (message "[adh] Diagnostic position: %s" style))
-
 (defun adh-toggle-lsp-format-on-save ()
   "Toggle formatting via LSP on save."
   (interactive)
@@ -268,3 +260,5 @@ LSP goes first, so servers are not restarted just before being shut down."
     (transient-setup 'adh-settings)))
 
 (provide 'adh-settings)
+
+;;; adh-settings.el ends here

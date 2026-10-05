@@ -12,3 +12,5 @@
     (message "[adh] Emacs server started.")))
 
 (provide 'adh-server)
+
+;;; adh-server.el ends here

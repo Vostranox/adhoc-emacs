@@ -1,9 +1,6 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-;; Source entry point.  `adh-compile-config' expands the module loads below
-;; into generated init.el and compiles it to init.elc.
-
-(adh-require! 'adh-vars)
+(adh-require! 'adh-options)
 
 (adh-load! "adh-custom-pre-init.el")
 
@@ -22,11 +19,7 @@
 (adh-require! 'adh-consult)
 (adh-require! 'adh-magit)
 (adh-require! 'adh-modeline)
-(when (and adh-use-custom-keybinds
-           (adh-keybinds-need! '(adh-core-packages adh-project adh-flycheck adh-ext-packages
-                                 adh-completion adh-settings adh-consult adh-magit)))
-  (adh-require! 'adh-meow)
-  (adh-require! 'adh-keybinds))
+(when (and (adh-layout-ready-p) (adh-require! 'adh-meow)) (adh-require! 'adh-keybinds))
 (adh-require! 'adh-server)
 
 (adh-load! "adh-custom-post-init.el")

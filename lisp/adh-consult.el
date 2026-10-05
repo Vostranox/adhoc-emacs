@@ -7,9 +7,8 @@
 (defvar adh--imenu-items nil
   "Items that the last consult-imenu prompt offered.")
 
-(defvar-keymap adh-consult-flycheck-map)
-
 (defun adh--imenu-marker (pos)
+  "Return a marker for Imenu position POS, or nil if it is unsupported."
   (pcase pos
     ((pred markerp) pos)
     ((pred integerp) (copy-marker pos))
@@ -108,13 +107,6 @@ When it already runs there, rerun it in the directory it started from."
                       (buffer-substring-no-properties (region-beginning) (region-end))
                     initial)))
 
-(defun adh-consult-flycheck-show-buffer-diagnostics ()
-  "Quit `consult-flycheck' and list the buffer's Flycheck diagnostics."
-  (interactive)
-  (let ((buf (window-buffer (minibuffer-selected-window))))
-    (run-at-time 0 nil (lambda () (with-current-buffer buf (flycheck-list-errors))))
-    (minibuffer-quit-recursive-edit)))
-
 (defun adh--imenu-remember-items (_prompt items)
   "Advice: keep the ITEMS a consult-imenu prompt offers, for the export."
   (setq adh--imenu-items items))
@@ -152,7 +144,8 @@ When it already runs there, rerun it in the directory it started from."
          (list (apply fn cmd)))))
 
 (defun adh--consult-scope (word origin files)
-  "Return (PATH BEG END) for each path the ./ or ../ WORD names from ORIGIN."
+  "Return (PATH BEG END) for each path the ./ or ../ WORD names from ORIGIN.
+When FILES is non-nil, include files as well as directories."
   (let* ((full (expand-file-name word origin))
          (parent (file-name-directory full))
          (part (file-name-nondirectory (directory-file-name word)))
@@ -171,6 +164,10 @@ When it already runs there, rerun it in the directory it started from."
                                                (file-name-all-completions
                                                 (file-name-nondirectory full) parent)))))))
                   (t (list full))))))
+
+(defun adh--pcre-quote (string)
+  "Escape STRING to match literally as a PCRE or Python regexp."
+  (replace-regexp-in-string (rx (any "\\.^$|?*+()[]{}")) "\\\\\\&" string))
 
 (defun adh--pcre-to-emacs-regexp (re)
   "Approximate PCRE RE in Emacs syntax for highlighting, dropping lookarounds."
@@ -195,7 +192,8 @@ When it already runs there, rerun it in the directory it started from."
    t t))
 
 (defun adh--consult-pcre-compiler (input _type ignore-case)
-  "Pass the words of INPUT to the tool as PCRE, highlighting an approximation."
+  "Pass the words of INPUT to the tool as PCRE, highlighting an approximation.
+IGNORE-CASE controls whether highlighting ignores case."
   (let ((regexps (consult--split-escaped input)))
     (cons (if (cdr regexps) (mapcar (lambda (r) (concat "(?:" r ")")) regexps) regexps)
           (when-let* ((hl (seq-filter #'consult--valid-regexp-p
@@ -203,7 +201,8 @@ When it already runs there, rerun it in the directory it started from."
             (apply-partially #'consult--highlight-regexps hl ignore-case)))))
 
 (defun adh--consult-scoped-builder (make-builder paths files)
-  "Builder from MAKE-BUILDER where input words like ./ or ../x set the PATHS."
+  "Wrap MAKE-BUILDER for PATHS so ./ and ../ input words set the search scope.
+When FILES is non-nil, allow file paths as well as directories in that scope."
   (let ((origin (adh--origin-dir))
         (builder (funcall make-builder paths))
         cache)
@@ -236,7 +235,8 @@ When it already runs there, rerun it in the directory it started from."
              (funcall builder rest))))))))
 
 (defun adh--consult-fd-scoped (make-builder paths)
-  "Advice: `adh--consult-scoped-builder' for fd, defaulting to -t file."
+  "Advise MAKE-BUILDER for fd with PATHS, defaulting to -t file.
+Use `adh--consult-scoped-builder' to handle directory scopes in the input."
   (let ((builder (adh--consult-scoped-builder make-builder paths nil)))
     (lambda (input)
       (let ((res (funcall builder input)))
@@ -247,7 +247,7 @@ When it already runs there, rerun it in the directory it started from."
         res))))
 
 (defun adh--consult-ripgrep-scoped (make-builder paths)
-  "Advice: `adh--consult-scoped-builder' for ripgrep, which also takes files."
+  "Advise MAKE-BUILDER for ripgrep with PATHS, allowing files in search scopes."
   (adh--consult-scoped-builder make-builder paths t))
 
 (use-package consult
@@ -310,3 +310,5 @@ When it already runs there, rerun it in the directory it started from."
   (setf (alist-get 'imenu embark-exporters-alist) #'adh-embark-export-imenu))
 
 (provide 'adh-consult)
+
+;;; adh-consult.el ends here

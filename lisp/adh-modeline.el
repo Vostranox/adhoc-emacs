@@ -144,7 +144,7 @@
 (add-hook 'find-file-hook #'adh--ml-note-project)
 
 (defun adh--ml-visit-project-root (event)
-  "Open the project root of the buffer whose mode line was clicked."
+  "Open the project root of the buffer whose mode line received mouse EVENT."
   (interactive "e")
   (with-selected-window (posn-window (event-start event))
     (when-let* ((root (adh--ml-project-root)))
@@ -206,7 +206,8 @@ A Dired buffer shows the name of its directory instead."
      'local-map mode-line-buffer-identification-keymap)))
 
 (defun adh--ml-set-coding-system (event)
-  "Prompt for this buffer's coding system, as \\[set-buffer-file-coding-system]."
+  "Set the coding system of the buffer whose mode line received mouse EVENT.
+Prompt as in \\[set-buffer-file-coding-system]."
   (interactive "e")
   (with-selected-window (posn-window (event-start event))
     (call-interactively #'set-buffer-file-coding-system)))
@@ -282,7 +283,7 @@ A Dired buffer shows the name of its directory instead."
       (concat "%[" (adh--ml-tint text adh--ml-fg) (adh--ml-tint "%n" adh--ml-muted) "%]"))))
 
 (defun adh--ml-select-tab (event)
-  "Switch to the tab whose name was clicked."
+  "Switch to the tab whose name received mouse EVENT."
   (interactive "e")
   (when-let* ((obj (posn-string (event-start event)))
               (n (get-text-property (cdr obj) 'adh--ml-tab (car obj))))
@@ -421,7 +422,7 @@ A Dired buffer shows the name of its directory instead."
   (force-mode-line-update))
 
 (defun adh--ml-click-minor-modes (event)
-  "Toggle the minor mode list of the buffer whose mode line was clicked."
+  "Toggle the minor mode list in the mode line that received mouse EVENT."
   (interactive "e")
   (with-selected-window (posn-window (event-start event))
     (adh-toggle-minor-modes)))
@@ -438,13 +439,13 @@ A Dired buffer shows the name of its directory instead."
     (get-text-property (cdr obj) 'adh--ml-minor-mode (car obj))))
 
 (defun adh--ml-minor-mode-menu (event)
-  "Show the menu of the minor mode whose lighter was clicked."
+  "Show the menu of the minor mode whose lighter received mouse EVENT."
   (interactive "@e")
   (when-let* ((mode (adh--ml-minor-mode-at event)))
     (minor-mode-menu-from-indicator mode (posn-window (event-start event)) event)))
 
 (defun adh--ml-minor-mode-help (event)
-  "Describe the minor mode whose lighter was clicked."
+  "Describe the minor mode whose lighter received mouse EVENT."
   (interactive "@e")
   (when-let* ((mode (adh--ml-minor-mode-at event)))
     (describe-minor-mode-from-symbol (or (get mode :minor-mode-function) mode))))
@@ -599,3 +600,5 @@ The count toggles the list; a lighter opens its mode's menu."
 (add-hook 'enable-theme-functions #'adh--ml-refresh-theme)
 
 (provide 'adh-modeline)
+
+;;; adh-modeline.el ends here

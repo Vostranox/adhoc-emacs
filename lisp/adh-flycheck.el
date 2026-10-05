@@ -1,13 +1,13 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-(require 'adh-vars)
+(require 'adh-options)
 (require 'adh-functions)
 
 (defvar flycheck-annotate-current-line-style)
 (defvar flycheck-error-list-buffer)
 
 (defun adh--apply-flycheck (on)
-  "Enable or disable Flycheck, its Eglot bridge and inline diagnostics."
+  "Turn Flycheck, its Eglot bridge and inline diagnostics ON or off."
   (when (or on (featurep 'flycheck))
     (require 'flycheck)
     (global-flycheck-eglot-mode (if on 1 -1))
@@ -21,12 +21,22 @@
     (global-flycheck-annotate-mode (if (and on adh-use-flycheck) 1 -1))))
 
 (defun adh--apply-flycheck-annotate-style (style)
-  "Put the current line's inline diagnostic below it or at its end per STYLE."
+  "Place current-line diagnostics according to STYLE.
+See `adh-flycheck-annotate-style' for the available positions."
   (set-default 'flycheck-annotate-current-line-style style)
   (when (featurep 'flycheck)
     (dolist (buf (buffer-list))
       (when (buffer-local-value 'flycheck-annotate-mode buf)
         (with-current-buffer buf (flycheck-annotate-mode 1))))))
+
+(defun adh-set-flycheck-annotate-style (style)
+  "Set the current-line diagnostic position to STYLE for this session.
+See `adh-flycheck-annotate-style' for the available positions."
+  (interactive
+   (list (intern (completing-read "Diagnostic position: " '("below" "eol" "sideline")
+                                  nil t nil nil (symbol-name adh-flycheck-annotate-style)))))
+  (customize-set-variable 'adh-flycheck-annotate-style style)
+  (message "[adh] Diagnostic position: %s" style))
 
 (defun adh--flycheck-dim-annotation-padding (overlay)
   "Give OVERLAY's leading spaces the code's whitespace face."
@@ -50,7 +60,8 @@
 (defun adh-set-flycheck-executable (checker program)
   "Use PROGRAM for Flycheck CHECKER without loading Flycheck.
 CHECKER is a Flycheck checker symbol, such as `c/c++-clang'.
-A nil PROGRAM restores the checker default; buffer-local settings take precedence."
+A nil PROGRAM restores the checker default.
+Buffer-local executable settings take precedence."
   (set-default (intern (format "flycheck-%s-executable" checker)) program))
 
 (use-package flycheck
@@ -71,3 +82,5 @@ A nil PROGRAM restores the checker default; buffer-local settings take precedenc
 (adh--apply-flycheck adh-use-flycheck)
 
 (provide 'adh-flycheck)
+
+;;; adh-flycheck.el ends here

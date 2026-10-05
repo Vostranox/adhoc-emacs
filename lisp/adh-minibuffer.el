@@ -1,9 +1,16 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-(require 'adh-vars)
+(require 'adh-options)
 
 (defvar consult--tofu-regexp)
 (defvar vertico-multiform-categories)
+
+(defun adh-minibuffer-next-history-or-clear (n)
+  "Move N steps forward through history, clearing the input past the end."
+  (interactive "p")
+  (condition-case nil
+      (next-history-element n)
+    (error (delete-minibuffer-contents))))
 
 (defun adh--apply-vertico-style (style)
   "Use STYLE for minibuffer completion without a more specific layout."
@@ -32,7 +39,6 @@
   :custom
   (vertico-resize 'grow-only)
   (vertico-flat-max-lines 3)
-  (vertico-multiform-commands '((consult-flycheck)))
   (vertico-buffer-display-action
    '(display-buffer-same-window (inhibit-same-window . nil) (body-function . (lambda (win) (delete-other-windows win)))))
   :config
@@ -71,11 +77,6 @@
   :config
   (vertico-prescient-mode))
 
-(use-package corfu-prescient
-  :ensure t :after corfu
-  :custom
-  (corfu-prescient-enable-filtering nil)
-  :config
-  (corfu-prescient-mode))
-
 (provide 'adh-minibuffer)
+
+;;; adh-minibuffer.el ends here

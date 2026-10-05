@@ -1,7 +1,7 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
 (when (version< emacs-version "31")
-  (error "[adh][error] The configuration assumes Emacs 31 or newer (found %s)." emacs-version))
+  (error "[adh][error] The configuration assumes Emacs 31 or newer (found %s)" emacs-version))
 
 (defcustom adh-auto-compile-config nil
   "When non-nil, check and rebuild stale compiled configuration after startup.
@@ -10,11 +10,14 @@ When nil, use `adh-compile-config' to check and compile on demand."
   :group 'adhoc
   :type 'boolean)
 
+(defvar adh-use-custom-keybinds)
+
 (defvar adh--init-errors-p nil
   "Non-nil if any adhoc loading errors occurred during initialization.")
 
 (defun adh--log-init-error (type target err)
-  "Log an init failure."
+  "Log an initialization failure of TYPE for TARGET using error data ERR.
+Return nil and mark initialization as failed."
   (let ((msg (format "[adh][error] %s %S: %s" type target (error-message-string err))))
     (message "%s" msg)
     (display-warning 'adhoc msg :error)
@@ -55,13 +58,19 @@ When nil, use `adh-compile-config' to check and compile on demand."
         t)
     (error (adh--log-init-error "Failed to load file" file err))))
 
-(defun adh-keybinds-need! (features)
-  "Return non-nil if FEATURES are loaded; otherwise report the keybindings as off."
-  (let ((missing (seq-remove #'featurep features)))
-    (when missing
-      (message "[adh] Custom keybindings off; they need %s"
-               (mapconcat #'symbol-name missing ", ")))
-    (null missing)))
+(defconst adh-layout-modules
+  '(adh-core-packages adh-project adh-flycheck adh-ext-packages
+    adh-completion adh-minibuffer adh-settings adh-consult adh-magit)
+  "Modules whose commands the custom keybindings bind.")
+
+(defun adh-layout-ready-p ()
+  "Return non-nil when the custom keybindings may load; say why otherwise."
+  (when adh-use-custom-keybinds
+    (let ((missing (seq-remove #'featurep adh-layout-modules)))
+      (when missing
+        (message "[adh] Custom keybindings off; they need %s"
+                 (mapconcat #'symbol-name missing ", ")))
+      (null missing))))
 
 (setq native-comp-async-env-modifier-form
       '(progn
@@ -149,3 +158,5 @@ If a build is already running, return that process."
 (add-hook 'emacs-startup-hook #'adh--maybe-compile-config)
 
 (provide 'adh-startup)
+
+;;; adh-startup.el ends here

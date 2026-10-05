@@ -1,6 +1,6 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-(require 'adh-vars)
+(require 'adh-options)
 
 (defvar corfu-auto)
 (defvar corfu-mode)
@@ -45,7 +45,8 @@
     (adh--eglot-sync)))
 
 (defun adh--completion-in-vertical-minibuffer (beg end table pred)
-  "Complete BEG to END in the minibuffer, listing candidates vertically."
+  "Complete BEG to END in the minibuffer, listing candidates vertically.
+TABLE and PRED have the same meaning as in `completion-in-region'."
   (let ((vertico-multiform-categories nil)
         (vertico-multiform-commands nil))
     (consult-completion-in-region beg end table pred)))
@@ -74,7 +75,7 @@
     (completion-at-point)))
 
 (defun adh--apply-completion-keys (keys)
-  "Set how the Corfu popup selects and accepts; see `adh-completion-keys'."
+  "Apply popup key scheme KEYS; see `adh-completion-keys'."
   (let ((go (eq keys 'tab-and-go)))
     (setq corfu-preselect (if go 'prompt 'first)
           corfu-cycle go)
@@ -117,6 +118,27 @@
   (customize-set-variable 'adh-completion-keys keys)
   (message "[adh] Popup keys: %s" keys))
 
+(defun adh-completion-in-region-isearch ()
+  "Jump to the *Completions* window and start isearch."
+  (interactive)
+  (select-window (get-buffer-window "*Completions*" t))
+  (isearch-forward))
+
+(defun adh-completion-choose ()
+  "Choose the selected or first *Completions* candidate and record it."
+  (interactive)
+  (let ((candidate (with-minibuffer-completions-window
+                     (unless (get-text-property (point) 'completion--string)
+                       (first-completion))
+                     (car (completion-list-candidate-at-point)))))
+    (minibuffer-choose-completion)
+    (when (and candidate (fboundp 'prescient-remember))
+      (prescient-remember candidate))))
+
+(defun adh--completions-key (cmd)
+  "Return a binding that runs CMD only while *Completions* is visible."
+  `(menu-item "" ,cmd :filter ,(lambda (c) (and (minibuffer--completions-visible) c))))
+
 (use-package completion-preview
   :ensure nil :defer t
   :config
@@ -148,6 +170,13 @@
     frame)
   (corfu-echo-mode 1)
   (corfu-popupinfo-mode 1))
+
+(use-package corfu-prescient
+  :ensure t :after corfu
+  :custom
+  (corfu-prescient-enable-filtering nil)
+  :config
+  (corfu-prescient-mode))
 
 (use-package cape
   :ensure t
@@ -210,3 +239,5 @@
           (t              "."   :icon "question"))))
 
 (provide 'adh-completion)
+
+;;; adh-completion.el ends here

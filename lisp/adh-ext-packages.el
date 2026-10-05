@@ -1,10 +1,63 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-(require 'adh-vars)
+(require 'adh-options)
 (require 'adh-functions)
 
 (defvar embark-exporters-alist)
 (defvar vr/engine)
+
+(defun adh--zoxide-add ()
+  "Add `default-directory' to zoxide if it is installed."
+  (when (executable-find "zoxide")
+    (zoxide-add)))
+
+(use-package zoxide
+  :ensure t
+  :hook
+  ((find-file dired-mode) . adh--zoxide-add))
+
+(defun adh--apply-use-dirvish (on)
+  "Open new Dired buffers in Dirvish when ON, else in plain Dired."
+  (when (and on (not (fboundp 'dirvish-override-dired-mode)))
+    (user-error "Dirvish is not installed"))
+  (cond (on (dirvish-override-dired-mode 1))
+        ((bound-and-true-p dirvish-override-dired-mode)
+         (dirvish-override-dired-mode -1))))
+
+(defun adh-switch-dired-dwim ()
+  "Jump through Dirvish history if in use, else switch to a Dired buffer."
+  (interactive)
+  (if (and adh-use-dirvish (fboundp 'dirvish-history-jump))
+      (call-interactively #'dirvish-history-jump)
+    (adh-switch-buffer-of-mode 'dired-mode "Dired: ")))
+
+(use-package dirvish
+  :vc (:url "https://github.com/Vostranox/dirvish" :rev :newest)
+  :defer t
+  :custom
+  (dirvish-use-header-line nil)
+  (dirvish-hide-cursor nil)
+  (dirvish-use-mode-line nil)
+  (dirvish-attributes '(collapse))
+  (dirvish-hide-details nil)
+  (dirvish-preview-dispatchers '(video image gif archive font pdf))
+  (dirvish-cache-dir (no-littering-expand-var-file-name "dirvish/"))
+  (dirvish-wdired-cursor nil)
+  (dirvish-preview-other-window nil)
+  (dirvish-fd-search-icon ":")
+  (dirvish-fd-switches "--full-path --hidden --no-ignore --exclude .git --path-separator=/")
+  (dirvish-fd-program (if (file-executable-p adh--fd-program) adh--fd-program (executable-find "fd")))
+  (dirvish-yank-keys '(("c" "Copy here" dirvish-yank)
+                       ("r" "Move here" dirvish-move)
+                       ("s" "Make symlinks here" dirvish-symlink)
+                       ("y" "Make relative symlinks here" dirvish-relative-symlink)
+                       ("h" "Make hardlinks here" dirvish-hardlink)))
+  :init
+  (with-eval-after-load 'dired
+    (with-demoted-errors "[adh] %S" (adh--apply-use-dirvish adh-use-dirvish)))
+  (with-eval-after-load 'embark
+    (when (fboundp 'dirvish-embark-export)
+      (setf (alist-get 'file embark-exporters-alist) #'dirvish-embark-export))))
 
 (defun adh-mc-keyboard-quit-dwim ()
   "Exit multiple-cursors if active, otherwise `adh-keyboard-quit-dwim'."
@@ -53,73 +106,6 @@
           (mc/create-fake-cursor-at-point))))
     (mc/maybe-multiple-cursors-mode)))
 
-(defun adh-avy-goto-line-indent ()
-  "Jump to a line with avy and land on its first non-blank character."
-  (interactive)
-  (avy-goto-line)
-  (back-to-indentation))
-
-(defun adh--apply-use-dirvish (on)
-  "Open new Dired buffers in Dirvish when ON, else in plain Dired."
-  (when (and on (not (fboundp 'dirvish-override-dired-mode)))
-    (user-error "Dirvish is not installed"))
-  (cond (on (dirvish-override-dired-mode 1))
-        ((bound-and-true-p dirvish-override-dired-mode)
-         (dirvish-override-dired-mode -1))))
-
-(defun adh-switch-dired-dwim ()
-  "Jump through Dirvish history if in use, else switch to a Dired buffer."
-  (interactive)
-  (if (and adh-use-dirvish (fboundp 'dirvish-history-jump))
-      (call-interactively #'dirvish-history-jump)
-    (adh-switch-buffer-of-mode 'dired-mode "Dired: ")))
-
-(defun adh--zoxide-add ()
-  "Add `default-directory' to zoxide if it is installed."
-  (when (executable-find "zoxide")
-    (zoxide-add)))
-
-(defun adh--vr-with-windows-shell (fn &rest args)
-  "Call FN with ARGS using cmdproxy for Visual Regexp's Python engine on Windows."
-  (if (and (eq system-type 'windows-nt) (eq vr/engine 'python))
-      (let ((shell-file-name (expand-file-name "cmdproxy.exe" exec-directory))
-            (shell-command-switch "/c"))
-        (apply fn args))
-    (apply fn args)))
-
-(use-package zoxide
-  :ensure t
-  :hook
-  ((find-file dired-mode) . adh--zoxide-add))
-
-(use-package dirvish
-  :vc (:url "https://github.com/Vostranox/dirvish" :rev :newest)
-  :defer t
-  :custom
-  (dirvish-use-header-line nil)
-  (dirvish-hide-cursor nil)
-  (dirvish-use-mode-line nil)
-  (dirvish-attributes '(collapse))
-  (dirvish-hide-details nil)
-  (dirvish-preview-dispatchers '(video image gif archive font pdf))
-  (dirvish-cache-dir (no-littering-expand-var-file-name "dirvish/"))
-  (dirvish-wdired-cursor nil)
-  (dirvish-preview-other-window nil)
-  (dirvish-fd-search-icon ":")
-  (dirvish-fd-switches "--full-path --hidden --no-ignore --exclude .git --path-separator=/")
-  (dirvish-fd-program (if (file-executable-p adh--fd-program) adh--fd-program (executable-find "fd")))
-  (dirvish-yank-keys '(("c" "Copy here" dirvish-yank)
-                       ("r" "Move here" dirvish-move)
-                       ("s" "Make symlinks here" dirvish-symlink)
-                       ("y" "Make relative symlinks here" dirvish-relative-symlink)
-                       ("h" "Make hardlinks here" dirvish-hardlink)))
-  :init
-  (with-eval-after-load 'dired
-    (with-demoted-errors "[adh] %S" (adh--apply-use-dirvish adh-use-dirvish)))
-  (with-eval-after-load 'embark
-    (when (fboundp 'dirvish-embark-export)
-      (setf (alist-get 'file embark-exporters-alist) #'dirvish-embark-export))))
-
 (use-package multiple-cursors
   :ensure t :defer t
   :custom
@@ -127,6 +113,12 @@
   :init
   (with-eval-after-load 'multiple-cursors-core
     (add-to-list 'mc--default-cmds-to-run-once #'adh-isearch-mc-mark-all)))
+
+(defun adh-avy-goto-line-indent ()
+  "Jump to a line with avy and land on its first non-blank character."
+  (interactive)
+  (avy-goto-line)
+  (back-to-indentation))
 
 (use-package avy
   :ensure t :defer t
@@ -147,6 +139,14 @@
   :ensure t :defer t
   :custom
   (vr/default-regexp-modifiers '(:I t :M t :S nil)))
+
+(defun adh--vr-with-windows-shell (fn &rest args)
+  "Call FN with ARGS using cmdproxy for Visual Regexp's Python engine on Windows."
+  (if (and (eq system-type 'windows-nt) (eq vr/engine 'python))
+      (let ((shell-file-name (expand-file-name "cmdproxy.exe" exec-directory))
+            (shell-command-switch "/c"))
+        (apply fn args))
+    (apply fn args)))
 
 (use-package visual-regexp-steroids
   :ensure t :after visual-regexp
@@ -185,6 +185,45 @@
   (with-eval-after-load 'magit
     (add-hook 'magit-post-refresh-hook #'diff-hl-magit-post-refresh)))
 
+(defvar popper-open-popup-alist)
+(defvar popper-popup-status)
+
+(defun adh--popup-buffer-p (buf)
+  "Return non-nil if BUF matches an entry of `adh-popup-buffers'."
+  (with-current-buffer buf
+    (seq-some (lambda (entry)
+                (if (stringp entry)
+                    (string-match-p entry (buffer-name))
+                  (derived-mode-p entry)))
+              adh-popup-buffers)))
+
+(defun adh--popper-display (buffer &optional alist)
+  "Show popup BUFFER where visible, else at the bottom, and select it.
+ALIST supplies action options as in `display-buffer'."
+  (save-current-buffer
+    (let ((win (or (display-buffer-reuse-window buffer alist)
+                   (popper-display-popup-at-bottom
+                    buffer (append alist '((window-parameters . ((no-other-window . t)))))))))
+      (when (window-parameter win 'window-side)
+        (adh--popper-window-height win))
+      (select-window win))))
+
+(defun adh-select-popup ()
+  "Select the open popup, or reopen the last one."
+  (interactive)
+  (if-let* ((win (caar popper-open-popup-alist)))
+      (select-window win)
+    (popper-toggle)))
+
+(defun adh-popup-toggle-type ()
+  "Turn the popup into a bottom window, or the current buffer into a popup."
+  (interactive)
+  (let ((display-buffer-overriding-action
+         (if (memq popper-popup-status '(popup user-popup))
+             `(display-buffer-at-bottom (window-height . ,(window-total-height)))
+           display-buffer-overriding-action)))
+    (popper-toggle-type)))
+
 (use-package popper
   :ensure t :demand t
   :custom
@@ -207,3 +246,5 @@
     (load-theme 'gruber-material-dark-intense :no-confirm)))
 
 (provide 'adh-ext-packages)
+
+;;; adh-ext-packages.el ends here

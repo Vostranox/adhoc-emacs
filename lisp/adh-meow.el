@@ -46,3 +46,5 @@
   (setq meow-update-cursor-functions-alist (assq-delete-all 'minibufferp meow-update-cursor-functions-alist)))
 
 (provide 'adh-meow)
+
+;;; adh-meow.el ends here

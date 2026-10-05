@@ -33,31 +33,11 @@
   (interactive)
   (adh--isearch-with-region nil))
 
-(defun adh--apply-vc (on)
-  "Turn the built-in VC backends and `global-diff-hl-mode' ON or off."
-  (if on
-      (progn
-        (setq vc-handled-backends '(RCS CVS SVN SCCS SRC Bzr Git Hg))
-        (dolist (buf (buffer-list))
-          (with-current-buffer buf
-            (when (and buffer-file-name
-                       (not (file-remote-p buffer-file-name)))
-              (ignore-errors (vc-refresh-state)))))
-        (when (require 'diff-hl nil t)
-          (global-diff-hl-mode 1)))
-    (setq vc-handled-backends nil)
-    (when (bound-and-true-p global-diff-hl-mode)
-      (global-diff-hl-mode -1))))
-
-(defun adh-switch-dired-buffer ()
-  "Switch to a Dired buffer."
+(defun adh-isearch-occur ()
+  "Run `occur' on the current isearch and exit isearch."
   (interactive)
-  (adh-switch-buffer-of-mode 'dired-mode "Dired: "))
-
-(use-package treesit
-  :ensure nil
-  :custom
-  (treesit-font-lock-level 4))
+  (call-interactively #'isearch-occur)
+  (isearch-done))
 
 (use-package isearch
   :ensure nil
@@ -68,6 +48,145 @@
   (lazy-count-prefix-format "(%s/%s) ")
   :config
   (advice-add 'isearch-occur :after #'adh--rename-isearch-occur-buffer))
+
+(defvar-local adh--occur-edit-changes nil
+  "Change group of the edits made since `occur-edit-mode' began.")
+
+(defvar-local adh--occur-edit-ticks nil
+  "Modification ticks of the Occur sources when `occur-edit-mode' began.")
+
+(defun adh--occur-source-buffers ()
+  "Return the buffers the lines of the current Occur buffer come from."
+  (save-restriction
+    (widen)
+    (let ((pos (point-min)) bufs)
+      (while pos
+        (when-let* ((target (get-text-property pos 'occur-target))
+                    (buf (marker-buffer (if (consp target) (caar target) target))))
+          (setq buf (or (buffer-base-buffer buf) buf))
+          (unless (memq buf bufs)
+            (push buf bufs)))
+        (setq pos (next-single-property-change pos 'occur-target)))
+      bufs)))
+
+(defun adh--occur-edit-plain-input (beg end _old-len)
+  "Strip faces from the text inserted between BEG and END."
+  (with-silent-modifications
+    (remove-text-properties beg end '(face nil font-lock-face nil))))
+
+(defun adh--occur-edit-start ()
+  "Record this `occur-edit-mode' session's edits, also in the sources, for undo."
+  (dolist (buf (buffer-list))
+    (when (buffer-local-value 'adh--occur-edit-changes buf)
+      (with-current-buffer buf
+        (occur-mode)
+        (set-buffer-modified-p nil))))
+  (let ((bufs (adh--occur-source-buffers)))
+    (setq adh--occur-edit-ticks
+          (mapcar (lambda (buf) (cons buf (buffer-chars-modified-tick buf))) bufs)
+          adh--occur-edit-changes
+          (mapcan #'prepare-change-group
+                  (cons (current-buffer)
+                        (seq-remove (lambda (buf)
+                                      (or (buffer-local-value 'buffer-read-only buf)
+                                          (get-buffer-process buf)))
+                                    bufs)))))
+  (activate-change-group adh--occur-edit-changes)
+  (dolist (elt adh--occur-edit-changes)
+    (with-current-buffer (car elt)
+      (setq-local undo-limit most-positive-fixnum
+                  undo-strong-limit most-positive-fixnum
+                  undo-outer-limit nil)))
+  (add-hook 'after-change-functions #'adh--occur-edit-plain-input nil t)
+  (add-hook 'change-major-mode-hook #'adh--occur-edit-end nil t)
+  (add-hook 'kill-buffer-hook #'adh--occur-edit-end nil t))
+
+(defun adh--occur-edit-end (&optional abort)
+  "Close the change group of this `occur-edit-mode' session, undoing it when ABORT."
+  (let ((changes adh--occur-edit-changes)
+        (after-change-functions nil))
+    (setq adh--occur-edit-changes nil)
+    (dolist (elt changes)
+      (when (buffer-live-p (car elt))
+        (with-demoted-errors "[adh] Occur edit: %S"
+          (if abort (cancel-change-group (list elt)) (accept-change-group (list elt))))
+        (with-current-buffer (car elt)
+          (mapc #'kill-local-variable '(undo-limit undo-strong-limit undo-outer-limit)))))))
+
+(defun adh-occur-edit-abort ()
+  "Undo the edits made in `occur-edit-mode', also in the sources, and leave it."
+  (interactive)
+  (adh--occur-edit-end t)
+  (occur-cease-edit)
+  (set-buffer-modified-p nil))
+
+(defun adh-occur-edit-save ()
+  "Leave `occur-edit-mode' and save the source files edited in it."
+  (interactive)
+  (let ((ticks adh--occur-edit-ticks))
+    (occur-cease-edit)
+    (set-buffer-modified-p nil)
+    (dolist (tick ticks)
+      (let ((buf (car tick)))
+        (when (and (buffer-live-p buf) (buffer-file-name buf) (buffer-modified-p buf)
+                   (/= (cdr tick) (buffer-chars-modified-tick buf)))
+          (with-current-buffer buf (save-buffer)))))))
+
+(use-package replace
+  :ensure nil :defer t
+  :hook
+  (occur-edit-mode . adh--occur-edit-start))
+
+(defun adh-switch-dired-buffer ()
+  "Switch to a Dired buffer."
+  (interactive)
+  (adh-switch-buffer-of-mode 'dired-mode "Dired: "))
+
+(defvar ls-lisp-use-insert-directory-program)
+
+(defun adh-dired-sort-toggle-or-edit (&optional arg)
+  "`dired-sort-toggle-or-edit' with ARG, via external ls on Windows.
+ls-lisp ignores sort switches."
+  (interactive "P" dired-mode)
+  (if (eq system-type 'windows-nt)
+      (let ((ls-lisp-use-insert-directory-program t))
+        (dired-sort-toggle-or-edit arg))
+    (dired-sort-toggle-or-edit arg)))
+
+(defun adh-dired-or-file ()
+  "In Dired, open a file; elsewhere, jump to the current file in Dired."
+  (interactive)
+  (if (derived-mode-p 'dired-mode)
+      (call-interactively 'find-file)
+    (dired-jump)))
+
+(defun adh-dired-duplicate-dwim ()
+  "Copy each marked file or directory to a numbered `_copy' sibling."
+  (interactive)
+  (let ((files (dired-get-marked-files t current-prefix-arg)))
+    (dolist (file files)
+      (setq file (directory-file-name file))
+      (let* ((dir  (file-name-directory file))
+             (name (file-name-nondirectory file))
+             (base (file-name-sans-extension name))
+             (ext  (or (file-name-extension name t) ""))
+             (clean-base (if (string-match "\\(.*\\)_copy[0-9]*$" base)
+                             (match-string 1 base)
+                           base))
+             (new-name (concat clean-base "_copy" ext))
+             (new-path (expand-file-name new-name dir))
+             (i 2))
+        (while (file-exists-p new-path)
+          (setq new-path (expand-file-name
+                          (concat clean-base "_copy" (number-to-string i) ext)
+                          dir))
+          (setq i (1+ i)))
+        (if (file-directory-p file)
+            (copy-directory file new-path t t t)
+          (copy-file file new-path nil t t t))
+        (dired-add-file new-path)))
+    (revert-buffer)
+    (message "Duplicated %d item(s)." (length files))))
 
 (defun adh--dired-rename-buffer ()
   "Name a Dired buffer PROJECT/REL/ inside a project, else by its path."
@@ -137,6 +256,22 @@
             (lambda ()
               (run-with-idle-timer 0 nil (lambda () (let ((inhibit-message t)) (recentf-cleanup)))))))
 
+(defun adh--apply-vc (on)
+  "Turn the built-in VC backends and `global-diff-hl-mode' ON or off."
+  (if on
+      (progn
+        (setq vc-handled-backends '(RCS CVS SVN SCCS SRC Bzr Git Hg))
+        (dolist (buf (buffer-list))
+          (with-current-buffer buf
+            (when (and buffer-file-name
+                       (not (file-remote-p buffer-file-name)))
+              (ignore-errors (vc-refresh-state)))))
+        (when (require 'diff-hl nil t)
+          (global-diff-hl-mode 1)))
+    (setq vc-handled-backends nil)
+    (when (bound-and-true-p global-diff-hl-mode)
+      (global-diff-hl-mode -1))))
+
 (add-to-list 'minor-mode-alist '(adh-use-vc " vc"))
 
 (use-package transient :defer t)
@@ -163,14 +298,6 @@
            (when adh-global-glasses-mode
              (adh-global-glasses-mode -1)))))
 
-(defun adh--apply-which-key (on)
-  "Turn `which-key-mode' ON or off; inside a transient menu, once it exits."
-  (remove-hook 'transient-exit-hook 'transient--resume-which-key-mode)
-  (cond ((and on (bound-and-true-p transient--prefix))
-         (add-hook 'transient-exit-hook 'transient--resume-which-key-mode))
-        (on (which-key-mode 1))
-        ((bound-and-true-p which-key-mode) (which-key-mode -1))))
-
 (use-package ediff
   :ensure nil :defer t
   :custom
@@ -187,6 +314,14 @@
   :hook
   (diff-mode . (lambda () (setq-local show-trailing-whitespace t))))
 
+(defun adh--apply-which-key (on)
+  "Turn `which-key-mode' ON or off; inside a transient menu, once it exits."
+  (remove-hook 'transient-exit-hook 'transient--resume-which-key-mode)
+  (cond ((and on (bound-and-true-p transient--prefix))
+         (add-hook 'transient-exit-hook 'transient--resume-which-key-mode))
+        (on (which-key-mode 1))
+        ((bound-and-true-p which-key-mode) (which-key-mode -1))))
+
 (use-package which-key
   :ensure nil :defer t
   :custom
@@ -198,3 +333,5 @@
 (adh--apply-which-key adh-use-which-key)
 
 (provide 'adh-core-packages)
+
+;;; adh-core-packages.el ends here

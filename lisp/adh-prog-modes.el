@@ -1,6 +1,6 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-(require 'adh-vars)
+(require 'adh-options)
 
 (defvar treesit-language-source-alist)
 
@@ -21,6 +21,7 @@
   :ensure nil
   :custom
   (treesit-auto-install-grammar 'always)
+  (treesit-font-lock-level 4)
   :config
   (setq treesit--install-language-grammar-out-dir-history
         (list (no-littering-expand-var-file-name "treesit/")))
@@ -34,6 +35,9 @@
 
 (use-package c-ts-mode
   :ensure nil :defer t
+  :custom
+  (c-ts-indent-offset 4)
+  (c-ts-mode-indent-style 'bsd)
   :hook
   (c-ts-mode . (lambda () (setq-local comment-start "// ") (setq-local comment-end ""))))
 
@@ -78,6 +82,7 @@
 (use-package cmake-mode :ensure t :defer t)
 (use-package glsl-mode :ensure t :defer t)
 (use-package go-mode :ensure t :defer t)
+(use-package go-ts-mode :ensure nil :defer t :custom (go-ts-indent-offset 4))
 (use-package haskell-mode :ensure t :defer t)
 (use-package json-mode :ensure t :defer t)
 (use-package powershell :ensure t :defer t)
@@ -88,3 +93,5 @@
 (use-package zig-mode :ensure t :defer t)
 
 (provide 'adh-prog-modes)
+
+;;; adh-prog-modes.el ends here

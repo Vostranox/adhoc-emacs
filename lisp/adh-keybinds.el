@@ -11,7 +11,6 @@
 (defvar git-commit-mode-map)
 (defvar git-rebase-mode-map)
 (defvar ibuffer-mode-map)
-(defvar adh-consult-flycheck-map)
 (defvar ediff-mode-map)
 (defvar electric-pair-mode-map)
 
@@ -566,3 +565,5 @@
     "i" #'ibuffer-visit-buffer))
 
 (provide 'adh-keybinds)
+
+;;; adh-keybinds.el ends here

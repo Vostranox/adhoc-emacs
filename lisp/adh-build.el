@@ -146,3 +146,5 @@ FILES is an alist of temporary source paths and final destination paths."
               (delete-file path))))))))
 
 (provide 'adh-build)
+
+;;; adh-build.el ends here

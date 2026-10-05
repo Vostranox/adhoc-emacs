@@ -4,6 +4,13 @@
   (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t))
 (require 'use-package)
 
+(defun adh-upgrade-packages (&optional query)
+  "Upgrade all packages, including those installed with package-vc.
+When QUERY is non-nil, ask before upgrading archive packages."
+  (interactive (list t))
+  (package-upgrade-all query)
+  (package-vc-upgrade-all))
+
 (defun adh--with-vc-git (fn &rest args)
   "Call FN with ARGS with the Git VC backend enabled."
   (let ((vc-handled-backends (if (memq 'Git vc-handled-backends)
@@ -22,3 +29,5 @@
   :ensure t :demand t)
 
 (provide 'adh-use-package-bootstrap)
+
+;;; adh-use-package-bootstrap.el ends here
