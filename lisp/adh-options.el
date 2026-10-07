@@ -176,8 +176,9 @@ Command-specific Vertico layouts take precedence."
   :group 'adhoc
   :type '(repeat string))
 
-(defcustom adh-tmux-cd-session "dev:eshell"
-  "Default tmux session or pane that `adh-tmux-cd' targets."
+(defcustom adh-tmux-session "quake:dev"
+  "Default tmux target of the `adh-tmux-' commands.
+A session name, or SESSION:WINDOW or SESSION:WINDOW.PANE."
   :group 'adhoc
   :type '(choice (const :tag "Current session" nil) string))
 

@@ -2,7 +2,7 @@
 
 (require 'adh-options)
 
-(defconst adh--tmux-command (if (eq system-type 'windows-nt) "wsl tmux" "tmux")
+(defconst adh--tmux-command (if (eq system-type 'windows-nt) "wsl -e tmux" "tmux")
   "Shell command used to talk to tmux (via WSL on Windows).")
 (defconst adh--fd-program (locate-user-emacs-file (concat "opt/fd/bin/fd" (when (eq system-type 'windows-nt) ".exe")))
   "The fd fork that install.sh builds.")
@@ -121,6 +121,40 @@ In a prompt that a pivot opened, hand FN back to that pivot instead."
         (set-mark (+ new-start mark-offset))
         (setq deactivate-mark nil))
       (goto-char (+ new-start point-offset)))))
+
+(defun adh--tmux-capture (buffer &optional history target)
+  "Capture tmux TARGET into BUFFER, with its full HISTORY when non-nil.
+TARGET defaults to `adh-tmux-session'."
+  (let ((cmd (split-string adh--tmux-command))
+        (target (or target adh-tmux-session)))
+    (with-current-buffer (get-buffer-create buffer)
+      (erase-buffer)
+      (apply #'call-process (car cmd) nil t nil
+             (append (cdr cmd) '("capture-pane" "-p")
+                     (and target (list "-t" target))
+                     (and history '("-S" "-")))))
+    (switch-to-buffer buffer)
+    (goto-char (point-max))
+    (skip-chars-backward " \t\n")))
+
+(defun adh--tmux-directory ()
+  "Emacs's current directory as a path for the tmux shell (WSL-style on Windows)."
+  (let ((dir (with-current-buffer (window-buffer (selected-window))
+               (or (and buffer-file-name (file-name-directory buffer-file-name))
+                   default-directory))))
+    (directory-file-name
+     (cond ((not (eq system-type 'windows-nt)) (expand-file-name dir))
+           ((string-match "^\\([a-zA-Z]\\):" dir)
+            (concat "/" (downcase (match-string 1 dir)) (substring dir 2)))
+           (t dir)))))
+
+(defun adh--tmux-run (name target &rest lines)
+  "Type each of LINES, followed by Enter, into tmux TARGET asynchronously.
+TARGET nil means the current pane.  NAME names the Emacs process."
+  (apply #'start-process name nil
+         (append (split-string adh--tmux-command) '("send-keys")
+                 (and target (list "-t" target))
+                 (list "-l" "--" (mapconcat (lambda (line) (concat line "\r")) lines)))))
 
 (defun adh-scroll-up-half ()
   "Move point up half a window and recenter."
@@ -449,47 +483,70 @@ With MARKED, copy the paths of marked Dired files, if any."
 
 (defalias 'adh-setenv #'setenv)
 
-(defun adh--tmux-capture (buffer &optional history)
-  "Capture the tmux pane into BUFFER, with its full HISTORY when non-nil."
-  (let ((content (shell-command-to-string
-                  (format "%s capture-pane -p%s" adh--tmux-command (if history " -S -" "")))))
-    (with-current-buffer (get-buffer-create buffer)
-      (erase-buffer)
-      (insert content))
-    (switch-to-buffer buffer)
-    (goto-char (point-max))
-    (skip-chars-backward " \t\n")))
-
-(defun adh-tmux-to-emacs-buffer ()
-  "Capture the visible tmux pane into the *tmux* buffer."
+(defun adh-tmux-to-emacs-buffer (&optional target)
+  "Capture the visible tmux pane into the *tmux* buffer.
+TARGET defaults to `adh-tmux-session'."
   (interactive)
-  (adh--tmux-capture "*tmux*"))
+  (adh--tmux-capture "*tmux*" nil target))
 
-(defun adh-tmux-to-emacs-buffer-all ()
-  "Capture the full tmux pane history into the *tmux-all* buffer."
+(defun adh-tmux-to-emacs-buffer-all (&optional target)
+  "Capture the full tmux pane history into the *tmux-all* buffer.
+TARGET defaults to `adh-tmux-session'."
   (interactive)
-  (adh--tmux-capture "*tmux-all*" t))
+  (adh--tmux-capture "*tmux-all*" t target))
+
+(defun adh--tmux-insert (capture buffer)
+  "Run CAPTURE, then insert the pane text it left in BUFFER at point."
+  (let ((buf (current-buffer)))
+    (save-window-excursion (funcall capture))
+    (with-current-buffer buf
+      (insert-buffer-substring buffer 1 (with-current-buffer buffer (point))))))
+
+(defun adh-tmux-insert-pane ()
+  "Insert the visible tmux pane at point."
+  (interactive)
+  (adh--tmux-insert #'adh-tmux-to-emacs-buffer "*tmux*"))
+
+(defun adh-tmux-insert-pane-all ()
+  "Insert the full tmux pane history at point."
+  (interactive)
+  (adh--tmux-insert #'adh-tmux-to-emacs-buffer-all "*tmux-all*"))
 
 (defun adh-tmux-cd (&optional target)
-  "Send a `cd' to Emacs's current directory to tmux TARGET asynchronously.
-TARGET defaults to `adh-tmux-cd-session'."
+  "Send a `cd' to Emacs's current directory to tmux TARGET.
+TARGET defaults to `adh-tmux-session'."
   (interactive)
-  (let* ((dir (with-current-buffer (window-buffer (selected-window))
-                (or (and buffer-file-name (file-name-directory buffer-file-name))
-                    default-directory)))
-         (path (cond ((not (eq system-type 'windows-nt)) (expand-file-name dir))
-                     ((string-match "^\\([a-zA-Z]\\):" dir)
-                      (concat "/" (downcase (match-string 1 dir)) (substring dir 2)))
-                     (t dir)))
-         (dest (or target adh-tmux-cd-session)))
-    (start-process-shell-command
-     "adh-tmux-cd" nil
-     (format "%s send-keys%s 'cd %s' C-m" adh--tmux-command
-             (if dest (concat " -t " (shell-quote-argument dest)) "")
-             (shell-quote-argument (directory-file-name path))))
+  (let ((path (adh--tmux-directory)))
+    (adh--tmux-run "adh-tmux-cd" (or target adh-tmux-session)
+                   (concat "cd " (shell-quote-argument path)))
     (when (called-interactively-p 'interactive)
       (message "Tmux directory -> '%s'" path))
     path))
+
+(defun adh-tmux-send-region (beg end &optional target)
+  "Run the text between BEG and END in tmux TARGET, like `compile'.
+The tmux shell first changes to Emacs's current directory and clears
+its screen, then runs the text.  TARGET defaults to `adh-tmux-session'.
+Interactively, send the active region, or the current line if there is
+none; with a prefix argument, prompt for TARGET."
+  (interactive
+   (list (if (use-region-p) (region-beginning) (line-beginning-position))
+         (if (use-region-p) (region-end) (line-end-position))
+         (when current-prefix-arg
+           (read-string "tmux target: " adh-tmux-session))))
+  (let ((text (replace-regexp-in-string
+               "[\n\r]+\\'" "" (buffer-substring-no-properties beg end)))
+        (dest (or target adh-tmux-session))
+        (path (adh--tmux-directory)))
+    (when (string= text "")
+      (user-error "Nothing to send to tmux"))
+    (adh--tmux-run "adh-tmux-send" dest
+                   (format "cd %s && clear" (shell-quote-argument path))
+                   text)
+    (when (called-interactively-p 'interactive)
+      (message "tmux %s in %s <- %s" (or dest "current")
+               (abbreviate-file-name path) text))
+    text))
 
 (defun adh-kill-process (&optional sigkill)
   "Signal a chosen process: SIGTERM, or SIGKILL with a prefix arg."
@@ -533,6 +590,15 @@ Falls back to the directory of the file or Dired buffer the minibuffer serves."
         (cond (buffer-file-name (file-name-directory buffer-file-name))
               ((derived-mode-p 'dired-mode) (dired-current-directory))
               (t default-directory)))))
+
+(defun adh-scratch-buffer ()
+  "Switch to *scratch* with `default-directory' set to where you came from.
+Uses the current file's directory, the Dired directory, or the buffer's
+`default-directory', so shell and compile commands run from there."
+  (interactive)
+  (let ((dir (adh--origin-dir)))
+    (scratch-buffer)
+    (setq default-directory dir)))
 
 (defun adh-show-buffer-file-encoding ()
   "Show the current buffer's file coding system."

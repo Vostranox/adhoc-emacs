@@ -2,7 +2,7 @@
 
 (setq frame-title-format "GNU Emacs")
 
-(setq adh-tmux-cd-session "session:window.pane")
+(setq adh-tmux-session "session:window.pane")
 
 (setopt adh-completion-style 'minimal
         adh-completion-ui 'popup

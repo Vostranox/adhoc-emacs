@@ -96,6 +96,8 @@
   "C-x u" #'vundo
   "C-x y" #'repeat
   "C-x h" #'mark-whole-buffer
+  "C-x I" #'adh-tmux-insert-pane
+  "C-x M-i" #'adh-tmux-insert-pane-all
   "C-x ." #'adh-settings)
 
 ;; C-x C
@@ -178,6 +180,7 @@
   "o" #'adh-async-shell-command-region
   "h" #'adh-project-compile-region
   "a" #'adh-project-async-shell-command-region
+  "e" #'adh-tmux-send-region
   "." #'recompile)
 
 (adh-defkeymap adh-magit-keymap
@@ -225,7 +228,7 @@
   "x" #'ediff-buffers
   "m" #'eval-buffer
   "w" #'eval-region
-  "a" #'scratch-buffer)
+  "a" #'adh-scratch-buffer)
 
 (adh-defkeymap adh-tab-keymap
   :map adh-leader-map
