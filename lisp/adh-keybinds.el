@@ -118,6 +118,8 @@
   "C-o" (cons "recentf-open" (=> (adh--minibuffer-pivot #'recentf-open)))
   "C-h" #'mark-word
   "M-d" #'adh-consult-dirs-pivot
+  "M-r" (cons "adh-consult-ripgrep-project" (=> (adh--minibuffer-pivot #'adh-consult-ripgrep-project)))
+  "M-s" (cons "adh-consult-fd-project" (=> (adh--minibuffer-pivot #'adh-consult-fd-project)))
   "M-o" (cons "zoxide-travel" (=> (adh--minibuffer-pivot #'zoxide-travel)))
   "M-a" #'embark-export
   "M-." #'adh-consult-root-pivot
