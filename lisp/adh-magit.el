@@ -130,7 +130,8 @@ With a prefix argument OTHER-WINDOW, display the buffer in another window."
 (defun adh-magit-log-buffer-file-follow ()
   "Show the log for the current file, following it across renames."
   (interactive)
-  (magit-log-buffer-file t))
+  (let ((magit-direct-use-buffer-arguments 'never))
+    (magit-log-buffer-file t)))
 
 (defun adh-magit-log-trace-region-or-line ()
   "Show the line-history (git log -L) of the region, or the current line."
