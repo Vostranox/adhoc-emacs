@@ -59,8 +59,15 @@
               (print-level nil)
               (pp-default-function
                (lambda (form)
-                 (cl-letf (((get 'condition-case 'lisp-indent-function) 1))
-                   (pp-fill form))))
+                 (let ((start (point-marker))
+                       (end (copy-marker (point) t)))
+                   (cl-letf (((get 'condition-case 'lisp-indent-function) 1))
+                     (pp-fill form))
+                   (unless (equal (car (read-from-string (buffer-substring-no-properties start end)))
+                                  form)
+                     (delete-region start end)
+                     (goto-char start)
+                     (pp-29 form)))))
               (pp-escape-newlines nil))
           (with-temp-file target
             (insert ";;; -*- lexical-binding: t; coding: utf-8 -*-\n"
