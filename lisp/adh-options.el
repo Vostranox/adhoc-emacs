@@ -74,6 +74,14 @@ Command-specific Vertico layouts take precedence."
   :initialize #'custom-initialize-default
   :set (adh--custom-setter 'adh--apply-vertico-style))
 
+(defcustom adh-use-picker nil
+  "When non-nil, open the prompts of `adh-picker-commands' in a floating
+picker that previews the current candidate."
+  :group 'adhoc
+  :type 'boolean
+  :initialize #'custom-initialize-default
+  :set (adh--custom-setter 'adh--apply-picker))
+
 (defcustom adh-use-lsp nil
   "When non-nil, start eglot in every buffer with a known LSP server."
   :group 'adhoc

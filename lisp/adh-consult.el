@@ -2,10 +2,31 @@
 
 (require 'adh-functions)
 
+(declare-function info--manual-names "info")
 (defvar crm-prompt)
+(defvar consult-buffer-sources)
+(defvar Info-current-file)
 (defvar consult--regexp-compiler)
+
 (defvar adh--imenu-items nil
   "Items that the last consult-imenu prompt offered.")
+(defvar adh-consult-info-manuals '("emacs" "elisp" "efaq" "cl")
+  "Manuals that `adh-consult-info' searches by default.")
+(defvar adh--consult-source-zoxide
+  `( :name     "Zoxide"
+     :narrow   ?z
+     :category file
+     :face     consult-file
+     :history  file-name-history
+     :action   ,#'consult--file-action
+     :enabled  ,(lambda () (executable-find "zoxide"))
+     :items    ,(lambda ()
+                  (mapcar (lambda (dir)
+                            (file-name-as-directory (consult--fast-abbreviate-file-name dir)))
+                          (zoxide-query))))
+  "Zoxide directory source for `consult-buffer'.")
+(defvar adh--grep-lookahead-cache (make-hash-table :test #'equal)
+  "Results of `consult--grep-lookahead-p', per host and command.")
 
 (defun adh--imenu-marker (pos)
   "Return a marker for Imenu position POS, or nil if it is unsupported."
@@ -18,124 +39,33 @@
   "Read comma-separated directories, prefilled with START."
   (let ((crm-prompt "%p")
         (def (abbreviate-file-name (or start default-directory)))
-        (minibuffer-completing-file-name t))
+        (minibuffer-completing-file-name t)
+        (this-command 'adh--read-dirs))
     (completing-read-multiple "Run in: " #'completion-file-name-table
                               #'directory-name-p t def 'consult--path-history def)))
 
 (defun adh--consult-with-region (command dir)
-  "Run consult COMMAND under DIR, seeded with the region."
+  "Run consult COMMAND under DIR, seeded with the region.
+With a prefix argument, read the directories to run in, starting from DIR."
   (let ((adh--command-origin-dir default-directory))
-    (funcall command dir (and (use-region-p)
-                              (replace-regexp-in-string
-                               (rx (group (or bos " ")) "-") "\\1\\\\-"
-                               (string-replace
-                                " " "\\ "
-                                (adh--pcre-quote
-                                 (buffer-substring-no-properties (region-beginning) (region-end)))))))))
+    (funcall command
+             (if current-prefix-arg (adh--read-dirs dir) dir)
+             (and (use-region-p)
+                  (replace-regexp-in-string
+                   (rx (group (or bos " ")) "-") "\\1\\\\-"
+                   (string-replace
+                    " " "\\ "
+                    (adh--pcre-quote
+                     (buffer-substring-no-properties (region-beginning) (region-end)))))))))
 
-(defun adh-consult-fd-dirs (&optional initial start)
-  "Find files in comma-separated directories; INITIAL seeds the input.
-START prefills the directory prompt."
-  (interactive)
-  (let ((adh--command-origin-dir (or start default-directory)))
-    (consult-fd (adh--read-dirs start) initial)))
-
-(defun adh-consult-ripgrep-dirs (&optional initial start)
-  "Grep in comma-separated directories; INITIAL seeds the input.
-START prefills the directory prompt."
-  (interactive)
-  (let ((adh--command-origin-dir (or start default-directory)))
-    (consult-ripgrep (adh--read-dirs start) initial)))
-
-(defun adh-consult-fd-here ()
-  "Find files below `default-directory'."
-  (interactive)
-  (adh--consult-with-region #'consult-fd default-directory))
-
-(defun adh-consult-ripgrep-here ()
-  "Grep below `default-directory'."
-  (interactive)
-  (adh--consult-with-region #'consult-ripgrep default-directory))
-
-(defun adh-consult-fd-project ()
-  "Find files in the current project."
-  (interactive)
-  (adh--consult-with-region #'consult-fd (adh--get-project-dir)))
-
-(defun adh-consult-ripgrep-project ()
-  "Grep the current project."
-  (interactive)
-  (adh--consult-with-region #'consult-ripgrep (adh--get-project-dir)))
-
-(defun adh-consult-dirs-pivot ()
-  "Rerun the current fd or ripgrep search in other directories."
-  (interactive)
-  (let ((input (minibuffer-contents-no-properties))
-        (start (adh--origin-dir))
-        (command (pcase (minibuffer-prompt)
-                   ((rx bos "Fd") #'adh-consult-fd-dirs)
-                   ((rx bos "Ripgrep") #'adh-consult-ripgrep-dirs)
-                   (_ (user-error "Not in a consult fd or ripgrep search")))))
-    (adh--minibuffer-pivot-call
-     (lambda ()
-       (let ((default-directory start))
-         (funcall command input start))))))
-
-(defun adh-consult-root-pivot ()
-  "Rerun the current fd or ripgrep search at the project root.
-When it already runs there, rerun it in the directory it started from."
-  (interactive)
-  (let* ((input (minibuffer-contents-no-properties))
-         (origin (adh--origin-dir))
-         (root (adh--get-project-dir origin))
-         (dir (if (and root (not (file-equal-p default-directory root))) root origin))
-         (command (pcase (minibuffer-prompt)
-                    ((rx bos "Fd") #'consult-fd)
-                    ((rx bos "Ripgrep") #'consult-ripgrep)
-                    (_ (user-error "Not in a consult fd or ripgrep search")))))
-    (when (file-equal-p dir default-directory)
-      (user-error (if root "Already at the project root" "Not in a project")))
-    (adh--minibuffer-pivot-call
-     (lambda ()
-       (let ((adh--command-origin-dir origin))
-         (funcall command dir input))))))
-
-(defun adh-consult-locate (&optional initial)
-  "Locate files by name, seeded with the active region or INITIAL."
-  (interactive)
-  (consult-locate (if (use-region-p)
-                      (buffer-substring-no-properties (region-beginning) (region-end))
-                    initial)))
+(defun adh--consult-xref-as-command (fn &rest args)
+  "Call FN with ARGS as the command `consult-xref'."
+  (let ((this-command 'consult-xref))
+    (apply fn args)))
 
 (defun adh--imenu-remember-items (_prompt items)
   "Advice: keep the ITEMS a consult-imenu prompt offers, for the export."
   (setq adh--imenu-items items))
-
-(defun adh-embark-export-imenu (names)
-  "Export the definition lines of imenu NAMES to an occur buffer."
-  (let ((items (cond ((memq (bound-and-true-p embark--command) '(consult-imenu consult-imenu-multi))
-                      adh--imenu-items)
-                     ((minibufferp) (with-minibuffer-selected-window (consult-imenu--items)))
-                     (t (consult-imenu--items))))
-        seen)
-    (embark-consult-export-location-occur
-     (delq nil
-           (mapcar (lambda (name)
-                     (when-let* ((marker (adh--imenu-marker (cdr (assoc name items)))))
-                       (with-current-buffer (marker-buffer marker)
-                         (save-restriction
-                           (widen)
-                           (save-excursion
-                             (goto-char marker)
-                             (let ((line (cons (current-buffer) (line-number-at-pos))))
-                               (unless (member line seen)
-                                 (push line seen)
-                                 (propertize (buffer-substring (pos-bol) (pos-eol))
-                                             'consult-location (cons marker (cdr line))))))))))
-                   names)))))
-
-(defvar adh--grep-lookahead-cache (make-hash-table :test #'equal)
-  "Results of `consult--grep-lookahead-p', per host and command.")
 
 (defun adh--consult-cache-lookahead (fn &rest cmd)
   "Advice: run the look-ahead check FN on CMD once per host and command."
@@ -201,8 +131,7 @@ IGNORE-CASE controls whether highlighting ignores case."
             (apply-partially #'consult--highlight-regexps hl ignore-case)))))
 
 (defun adh--consult-scoped-builder (make-builder paths files)
-  "Wrap MAKE-BUILDER for PATHS so ./ and ../ input words set the search scope.
-When FILES is non-nil, allow file paths as well as directories in that scope."
+  "Wrap MAKE-BUILDER for PATHS so ./ and ../ input words set the search scope."
   (let ((origin (adh--origin-dir))
         (builder (funcall make-builder paths))
         cache)
@@ -250,6 +179,160 @@ Use `adh--consult-scoped-builder' to handle directory scopes in the input."
   "Advise MAKE-BUILDER for ripgrep with PATHS, allowing files in search scopes."
   (adh--consult-scoped-builder make-builder paths t))
 
+(defun adh--consult-prompt-name (args)
+  "Advice: name ripgrep searches \"rg\" in the prompt ARGS describe.
+ARGS are the PROMPT and DIR of `consult--directory-prompt'."
+  (if (equal (car args) "Ripgrep")
+      (cons "Rg" (cdr args))
+    args))
+
+(defun adh--consult-prompt-origin (result)
+  "Advice: name, in the prompt of RESULT, the directory ./ words start from."
+  (pcase-let* ((`(,prompt ,paths ,dir) result)
+               (origin (file-name-as-directory (expand-file-name (adh--origin-dir)))))
+    (if (or (not (string-match-p (rx bos (or "Fd" "Rg") (* nonl) "): " eos) prompt))
+            (file-equal-p origin dir))
+        result
+      (let ((rel (directory-file-name (file-relative-name origin dir))))
+        (list (concat (substring prompt 0 -3)
+                      (if (string-prefix-p "../" rel)
+                          (concat ", from " (abbreviate-file-name (directory-file-name origin)))
+                        (concat "/…/" (file-name-nondirectory rel)))
+                      "): ")
+              paths dir)))))
+
+(defun adh-consult-fd-dirs (&optional initial start)
+  "Find files in comma-separated directories; INITIAL seeds the input.
+START prefills the directory prompt."
+  (interactive)
+  (let ((adh--command-origin-dir (or start default-directory)))
+    (consult-fd (adh--read-dirs start) initial)))
+
+(defun adh-consult-ripgrep-dirs (&optional initial start)
+  "Grep in comma-separated directories; INITIAL seeds the input.
+START prefills the directory prompt."
+  (interactive)
+  (let ((adh--command-origin-dir (or start default-directory)))
+    (consult-ripgrep (adh--read-dirs start) initial)))
+
+(defun adh-consult-fd-here ()
+  "Find files below `default-directory'."
+  (interactive)
+  (adh--consult-with-region #'consult-fd default-directory))
+
+(defun adh-consult-ripgrep-here ()
+  "Grep below `default-directory'."
+  (interactive)
+  (adh--consult-with-region #'consult-ripgrep default-directory))
+
+(defun adh-consult-fd-project ()
+  "Find files in the current project."
+  (interactive)
+  (adh--consult-with-region #'consult-fd (adh--get-project-dir)))
+
+(defun adh-consult-ripgrep-project ()
+  "Grep the current project."
+  (interactive)
+  (adh--consult-with-region #'consult-ripgrep (adh--get-project-dir)))
+
+(defun adh-consult-dirs-pivot ()
+  "Rerun the current fd or ripgrep search in other directories."
+  (interactive)
+  (let ((input (minibuffer-contents-no-properties))
+        (start (adh--origin-dir))
+        (command (pcase (minibuffer-prompt)
+                   ((rx bos "Fd") #'adh-consult-fd-dirs)
+                   ((rx bos "rg ") #'adh-consult-ripgrep-dirs)
+                   (_ (user-error "Not in a consult fd or ripgrep search")))))
+    (adh--minibuffer-pivot-call
+     (lambda ()
+       (let ((default-directory start)
+             (this-command command))
+         (funcall command input start))))))
+
+(defun adh-consult-root-pivot ()
+  "Rerun the current fd or ripgrep search at the project root."
+  (interactive)
+  (let* ((input (minibuffer-contents-no-properties))
+         (origin (adh--origin-dir))
+         (root (adh--get-project-dir origin))
+         (dir (if (and root (not (file-equal-p default-directory root))) root origin))
+         (command (pcase (minibuffer-prompt)
+                    ((rx bos "Fd") #'consult-fd)
+                    ((rx bos "rg ") #'consult-ripgrep)
+                    (_ (user-error "Not in a consult fd or ripgrep search")))))
+    (when (file-equal-p dir default-directory)
+      (user-error (if root "Already at the project root" "Not in a project")))
+    (adh--minibuffer-pivot-call
+     (lambda ()
+       (let ((adh--command-origin-dir origin)
+             (this-command command))
+         (funcall command dir input))))))
+
+(defun adh-consult-locate (&optional initial)
+  "Locate files by name, seeded with the active region or INITIAL."
+  (interactive)
+  (consult-locate (if (use-region-p)
+                      (buffer-substring-no-properties (region-beginning) (region-end))
+                    initial)))
+
+(defun adh-consult-buffer (&optional all)
+  "Switch to a buffer with `consult-buffer', listing only buffers.
+Narrowing reaches the hidden buffers (SPC), the modified ones (*) and
+those of the current project (p).  With a prefix argument ALL, list
+everything `consult-buffer' does, such as recent files and bookmarks."
+  (interactive "P")
+  (require 'consult)
+  (let ((consult-buffer-sources
+         (if all
+             consult-buffer-sources
+           '(consult-source-buffer consult-source-hidden-buffer
+             consult-source-modified-buffer consult-source-project-buffer-hidden))))
+    (consult-buffer)))
+
+(defun adh-consult-info (&optional choose)
+  "Search the manuals of `adh-consult-info-manuals' with `consult-info'."
+  (interactive "P")
+  (apply #'consult-info
+         (cond (choose
+                (info-initialize)
+                (let ((this-command 'adh--read-info-manuals))
+                  (completing-read-multiple "Info manuals: " (info--manual-names nil) nil t)))
+               (Info-current-file (list (file-name-base Info-current-file)))
+               (t adh-consult-info-manuals))))
+
+(defun adh-consult-zoxide ()
+  "Visit a directory from zoxide's database, picked with consult."
+  (interactive)
+  (require 'consult)
+  (consult--multi '(adh--consult-source-zoxide)
+                  :prompt "Open dir: "
+                  :require-match t
+                  :sort nil))
+
+(defun adh-embark-export-imenu (names)
+  "Export the definition lines of imenu NAMES to an occur buffer."
+  (let ((items (cond ((memq (bound-and-true-p embark--command) '(consult-imenu consult-imenu-multi))
+                      adh--imenu-items)
+                     ((minibufferp) (with-minibuffer-selected-window (consult-imenu--items)))
+                     (t (consult-imenu--items))))
+        seen)
+    (embark-consult-export-location-occur
+     (delq nil
+           (mapcar (lambda (name)
+                     (when-let* ((marker (adh--imenu-marker (cdr (assoc name items)))))
+                       (with-current-buffer (marker-buffer marker)
+                         (save-restriction
+                           (widen)
+                           (save-excursion
+                             (goto-char marker)
+                             (let ((line (cons (current-buffer) (line-number-at-pos))))
+                               (unless (member line seen)
+                                 (push line seen)
+                                 (propertize (buffer-substring (pos-bol) (pos-eol))
+                                             'consult-location (cons marker (cdr line))))))))))
+                   names)))))
+
 (use-package consult
   :ensure t :defer t
   :init
@@ -261,12 +344,16 @@ Use `adh--consult-scoped-builder' to handle directory scopes in the input."
   (consult-narrow-key "C-,")
   (consult-preview-key "M-SPC")
   (consult-line-start-from-top t)
+  (xref-show-xrefs-function #'consult-xref)
+  (xref-show-definitions-function #'consult-xref)
   :config
+  (advice-add 'consult-xref :around #'adh--consult-xref-as-command)
   (plist-put consult-source-buffer :items
              (lambda () (consult--buffer-query
                          :sort 'visibility
                          :predicate #'adh--buffer-listable-p
                          :as #'consult--buffer-pair)))
+  (add-to-list 'consult-buffer-sources 'adh--consult-source-zoxide 'append)
 
   (defvar adh--consult-ripgrep-args-base consult-ripgrep-args)
 
@@ -275,6 +362,8 @@ Use `adh--consult-scoped-builder' to handle directory scopes in the input."
 
   (advice-add 'consult--fd-make-builder :around #'adh--consult-fd-scoped)
   (advice-add 'consult--ripgrep-make-builder :around #'adh--consult-ripgrep-scoped)
+  (advice-add 'consult--directory-prompt :filter-args #'adh--consult-prompt-name)
+  (advice-add 'consult--directory-prompt :filter-return #'adh--consult-prompt-origin)
   (advice-add 'consult--grep-lookahead-p :around #'adh--consult-cache-lookahead)
   (advice-add 'consult-imenu--select :before #'adh--imenu-remember-items)
 
@@ -288,7 +377,9 @@ Use `adh--consult-scoped-builder' to handle directory scopes in the input."
      (setq consult-locate-args "locate -i -r")))
 
   (consult-customize consult-imenu consult-goto-line :preview-key 'any)
-  (consult-customize consult-imenu-multi consult-goto-line :preview-key 'any))
+  (consult-customize consult-imenu-multi consult-goto-line :preview-key 'any)
+  (consult-customize consult-buffer adh-consult-buffer consult-bookmark :require-match t)
+  (consult-customize consult-recent-file :prompt "Open file: "))
 
 (use-package embark
   :ensure t :defer t

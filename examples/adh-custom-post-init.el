@@ -8,6 +8,7 @@
         adh-completion-ui 'popup
         adh-completion-keys 'tab-only
         adh-vertico-style 'flat
+        adh-use-picker t
         adh-use-lsp nil
         adh-use-flycheck nil
         adh-flycheck-annotate t
@@ -24,6 +25,8 @@
         adh-mono-spaced-font-size 110)
 
 (setq shell-file-name "/usr/bin/fish")
+
+(setopt adh-picker-commands (remq 'consult-bookmark adh-picker-commands))
 
 (when (eq system-type 'windows-nt)
   (setq shell-file-name "powershell.exe"

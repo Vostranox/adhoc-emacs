@@ -7,7 +7,7 @@
 (require 'adh-startup)
 
 (defconst adh--settings-options
-  '(adh-completion-style adh-completion-ui adh-completion-keys adh-vertico-style
+  '(adh-completion-style adh-completion-ui adh-completion-keys adh-vertico-style adh-use-picker
     adh-use-lsp adh-use-vc adh-subwords adh-use-electric-pair adh-use-which-key adh-use-flycheck
     adh-flycheck-annotate adh-flycheck-annotate-style
     adh-lsp-format-on-save adh-use-dirvish adh-window-decoration adh-frame-opacity
@@ -122,6 +122,11 @@ LSP goes first, so servers are not restarted just before being shut down."
   (interactive)
   (adh--toggle-setting 'adh-use-electric-pair "Auto pairs"))
 
+(defun adh-toggle-picker ()
+  "Toggle the floating picker with a preview for picker commands."
+  (interactive)
+  (adh--toggle-setting 'adh-use-picker "Picker"))
+
 (defun adh-toggle-which-key ()
   "Toggle the which-key list of keys that follow a prefix."
   (interactive)
@@ -178,7 +183,10 @@ LSP goes first, so servers are not restarted just before being shut down."
     ["Minibuffer"
      ("V" adh-set-vertico-style
       :description (lambda () (adh--settings-value "vertico" 'adh-vertico-style))
-      :if (lambda () (featurep 'adh-minibuffer)))])
+      :if (lambda () (featurep 'adh-minibuffer)))
+     ("P" adh-toggle-picker
+      :description (lambda () (adh--settings-switch "picker" 'adh-use-picker))
+      :if (lambda () (featurep 'adh-picker)))])
 
   (transient-define-prefix adh-settings-display ()
     "Change appearance and diagnostic position; C-g returns to settings."

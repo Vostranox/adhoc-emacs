@@ -17,6 +17,7 @@
 (adh-require! 'adh-minibuffer)
 (adh-require! 'adh-prog-modes)
 (adh-require! 'adh-consult)
+(adh-require! 'adh-picker)
 (adh-require! 'adh-magit)
 (adh-require! 'adh-modeline)
 (when (and (adh-layout-ready-p) (adh-require! 'adh-meow)) (adh-require! 'adh-keybinds))

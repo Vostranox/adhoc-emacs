@@ -5,6 +5,7 @@
 
 (defvar embark-exporters-alist)
 (defvar vr/engine)
+(defvar dirvish-history-sort-function)
 
 (defun adh--zoxide-add ()
   "Add `default-directory' to zoxide if it is installed."
@@ -27,8 +28,17 @@
 (defun adh-switch-dired-dwim ()
   "Jump through Dirvish history if in use, else switch to a Dired buffer."
   (interactive)
-  (if (and adh-use-dirvish (fboundp 'dirvish-history-jump))
-      (call-interactively #'dirvish-history-jump)
+  (if (and adh-use-dirvish (require 'dirvish-history nil t))
+      (progn
+        (unless dired-buffers
+          (user-error "No Dired history"))
+        (dirvish--find-entry
+         'find-file
+         (completing-read "Open dired: "
+                          (dirvish--completion-table-with-metadata
+                           (mapcar #'car dired-buffers)
+                           `((category . file)
+                             (display-sort-function . ,dirvish-history-sort-function))))))
     (adh-switch-buffer-of-mode 'dired-mode "Dired: ")))
 
 (use-package dirvish

@@ -62,11 +62,10 @@ In a prompt that a pivot opened, hand FN back to that pivot instead."
   (let ((input (minibuffer-contents)))
     (adh--minibuffer-pivot-call
      (lambda ()
-       (minibuffer-with-setup-hook
-           (lambda ()
-             (setq this-command command)
-             (insert input))
-         (call-interactively command))))))
+       (let ((this-command command))
+         (minibuffer-with-setup-hook
+             (lambda () (insert input))
+           (call-interactively command)))))))
 
 (defun adh--with-saved-window (fn)
   "Call FN interactively without letting it change the selected window."
@@ -611,6 +610,14 @@ Uses the current file's directory, the Dired directory, or the buffer's
   (if (> (minibuffer-depth) 0)
       (abort-recursive-edit)
     (keyboard-quit)))
+
+(defun adh-tab-switch (name)
+  "Switch to the tab NAME, like `tab-switch' but with a shorter prompt."
+  (interactive
+   (let ((recent (mapcar (lambda (tab) (alist-get 'name tab)) (tab-bar--tabs-recent))))
+     (list (completing-read (format-prompt "Switch tab" (car recent))
+                            recent nil nil nil nil recent))))
+  (tab-bar-switch-to-tab name))
 
 (provide 'adh-functions)
 

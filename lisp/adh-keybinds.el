@@ -15,18 +15,26 @@
 (defvar electric-pair-mode-map)
 
 (declare-function dirvish-subtree--expanded-p "dirvish-subtree")
+(declare-function vertico-multiform-vertical "vertico-multiform" t t)
+(declare-function corfu-popupinfo-toggle "corfu-popupinfo")
+(declare-function org-agenda-month-view "org-agenda")
+(declare-function git-rebase-move-line-up "git-rebase")
+(declare-function git-rebase-move-line-down "git-rebase")
+(declare-function ibuffer-visit-buffer "ibuffer")
+(declare-function ibuffer-visit-buffer-other-window "ibuffer")
+(declare-function ibuffer-visit-buffer-other-window-noselect "ibuffer")
 
 ;;; override map
 
 (define-keymap :keymap adh-override-map
   "C-d" #'other-window
   "C-b" #'adh-select-popup
-  "C-o" #'recentf-open
+  "C-o" #'consult-recent-file
   "M-n" #'adh-project-compile-region
   "M-r" #'adh-consult-ripgrep-project
   "M-t" #'adh-project-async-shell-command-region
   "M-s" #'adh-consult-fd-project
-  "M-o" #'zoxide-travel)
+  "M-o" #'adh-consult-zoxide)
 
 (dolist (hook '(prog-mode-hook nxml-mode-hook markdown-mode-hook markdown-ts-mode-hook))
   (add-hook hook (lambda () (use-local-map nil))))
@@ -88,7 +96,7 @@
 ;; C-x
 (define-keymap :keymap global-map
   "C-x d" #'adh-switch-dired-dwim
-  "C-x b" #'switch-to-buffer
+  "C-x b" #'adh-consult-buffer
   "C-x g" #'adh-magit-status-dwim
   "C-x j" (cons "find-file-project-root"
                 (=> (find-file (or (adh--get-project-dir) default-directory))))
@@ -108,24 +116,28 @@
 (keymap-set global-map "C-x RET o" #'adh-show-buffer-file-encoding)
 
 ;; M-g
+(keymap-set global-map "M-g f" #'consult-flycheck)
 (keymap-set global-map "M-g i" #'consult-imenu-multi)
+
+(keymap-set help-map "i" #'adh-consult-info)
+(keymap-set global-map "<remap> <repeat-complex-command>" #'consult-complex-command)
 
 ;;; minibuffer map
 
 (define-keymap :keymap minibuffer-local-map
   "C-l" #'kill-ring-save
   "C-r" #'consult-history
-  "C-o" (cons "recentf-open" (=> (adh--minibuffer-pivot #'recentf-open)))
+  "C-o" (cons "consult-recent-file" (=> (adh--minibuffer-pivot #'consult-recent-file)))
   "C-h" #'mark-word
   "M-d" #'adh-consult-dirs-pivot
   "M-r" (cons "adh-consult-ripgrep-project" (=> (adh--minibuffer-pivot #'adh-consult-ripgrep-project)))
   "M-s" (cons "adh-consult-fd-project" (=> (adh--minibuffer-pivot #'adh-consult-fd-project)))
-  "M-o" (cons "zoxide-travel" (=> (adh--minibuffer-pivot #'zoxide-travel)))
+  "M-o" (cons "adh-consult-zoxide" (=> (adh--minibuffer-pivot #'adh-consult-zoxide)))
   "M-a" #'embark-export
   "M-." #'adh-consult-root-pivot
   "M-<" #'end-of-buffer
   "M->" #'minibuffer-beginning-of-buffer
-  "C-x b" (cons "switch-to-buffer" (=> (adh--minibuffer-pivot #'switch-to-buffer)))
+  "C-x b" (cons "adh-consult-buffer" (=> (adh--minibuffer-pivot #'adh-consult-buffer)))
   "<backspace>" #'adh-backward-delete-char-dwim
   "<remap> <next-line>" #'next-line-or-history-element
   "<remap> <previous-line>" #'previous-line-or-history-element)
@@ -144,9 +156,10 @@
 (adh-defkeymap adh-leader-map
   :map global-map
   :prefix "C-x C-o"
-  "l" #'tab-switch
-  "c" #'adh-switch-to-buffer
-  "b" #'bookmark-jump
+  "l" #'adh-tab-switch
+  "d" #'adh-switch-dired-dwim
+  "c" #'adh-consult-buffer
+  "b" #'consult-bookmark
   "x" #'adh-toggle-meow-motion-mode
   "w" #'adh-dired-or-file
   "DEL" #'find-file)
@@ -156,6 +169,7 @@
   :prefix "s"
   "f" #'adh-consult-fd-here
   "h" #'adh-consult-fd-project
+  "z" #'adh-consult-zoxide
   "," #'adh-get-executable
   "." #'adh-consult-locate
   "/" #'adh-getenv)
@@ -193,6 +207,13 @@
   "h" #'magit-dispatch
   "a" #'adh-magit-status-dwim
   "e" #'adh-magit-staging-quick
+  "l" #'adh-git-log
+  "L" #'adh-git-log-file
+  "t" #'adh-git-log-line
+  "s" #'adh-git-status
+  "d" #'adh-git-hunks
+  "b" #'adh-git-branches
+  "z" #'adh-git-stash
   "." #'adh-magit-status-dwim
   "/" #'magit-find-file)
 
@@ -215,6 +236,7 @@
   "t" #'split-window-vertically
   "s" #'split-window-horizontally
   "m" #'popper-toggle
+  "w" #'window-swap-states
   "x" #'adh-popup-toggle-type)
 
 (adh-defkeymap adh-buffer-keymap

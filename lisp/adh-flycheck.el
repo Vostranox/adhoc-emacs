@@ -78,6 +78,9 @@ Buffer-local executable settings take precedence."
   (flycheck-error-list-after-refresh . adh--flycheck-fit-error-list)
   (flycheck-error-list-mode . (lambda () (setq tab-line-format nil))))
 
+(use-package consult-flycheck
+  :ensure t :defer t)
+
 (adh--apply-flycheck-annotate-style adh-flycheck-annotate-style)
 (adh--apply-flycheck adh-use-flycheck)
 

@@ -15,6 +15,29 @@
         (push (read (current-buffer)) forms))
       (nreverse forms))))
 
+(defun adh--defined-functions (form)
+  "Return the functions that FORM, or any form within it, defines."
+  (pcase form
+    (`(,(or 'quote 'function) . ,_) nil)
+    (`(,(or 'defun 'defsubst 'cl-defun 'define-minor-mode 'define-derived-mode)
+       ,(and (pred symbolp) name) . ,_)
+     (list (list name)))
+    (`(define-globalized-minor-mode ,(and (pred symbolp) name) . ,_)
+     (list (list name) (cons (intern (format "%s-enable-in-buffer" name)) t)))
+    (`(defalias ',(and (pred symbolp) name) . ,_) (list (list name)))
+    (`(define-advice ,(and (pred symbolp) symbol) (,_ ,_ ,(and (pred symbolp) name) . ,_) . ,_)
+     (list (cons (intern (format "%s@%s" symbol name)) t)))
+    ((pred proper-list-p) (mapcan #'adh--defined-functions form))))
+
+(defun adh--module-form (form)
+  "Return the module's top-level FORM as init.el needs it."
+  (pcase form
+    (`(declare-function ,function ,(and (pred stringp) (pred (string-prefix-p "adh-")) file)
+                        . ,rest)
+     `(declare-function ,function ,(format "lisp/%s.el" (file-name-sans-extension file))
+                        ,@rest))
+    (_ form)))
+
 (defun adh--generate-init (target)
   "Expand config.el's module loads into the source file TARGET."
   (let (dependencies declarations)
@@ -26,7 +49,7 @@
             (pcase form
               (`(adh-require! ',(and (pred symbolp) feature))
                (let* ((file (locate-user-emacs-file (format "lisp/%s.el" feature)))
-                      (body (adh--read-config-forms file)))
+                      (body (mapcar #'adh--module-form (adh--read-config-forms file))))
                  (dolist (item body)
                    (pcase (car-safe item)
                      ((or 'require 'eval-when-compile 'eval-and-compile)
@@ -41,7 +64,11 @@
                             dependencies))
                      ((or 'defvar 'defvar-local 'defconst 'defcustom 'defvar-keymap
                           'define-minor-mode 'define-globalized-minor-mode)
-                      (push `(defvar ,(cadr item)) declarations))))
+                      (push `(defvar ,(cadr item)) declarations)))
+                   (pcase-dolist (`(,function . ,generated) (adh--defined-functions item))
+                     (push `(declare-function ,function ,(format "lisp/%s.el" feature)
+                                              ,@(and generated '(t t)))
+                           declarations)))
                  `(condition-case err
                       (progn
                         (unless (featurep ',feature)
@@ -134,7 +161,8 @@ FILES is an alist of temporary source paths and final destination paths."
             (package-activate-all))
           (eval native-comp-async-env-modifier-form t)
           (message "[adh] Compiling init.el...")
-          (unless (byte-compile-file staged-init)
+          (unless (let ((byte-compile-warnings '(not noruntime)))
+                    (byte-compile-file staged-init))
             (error "[adh] Compiling generated init.el failed"))
           (message "[adh] Publishing compiled configuration...")
           (adh--publish-config

@@ -3,6 +3,7 @@
 (require 'adh-options)
 (require 'adh-functions)
 
+(declare-function yas-exit-all-snippets "yasnippet")
 (defvar eglot-server-programs)
 (defvar eglot-stay-out-of)
 

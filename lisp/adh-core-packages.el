@@ -2,6 +2,8 @@
 
 (require 'adh-functions)
 
+(declare-function glasses-mode--set-explicitly "glasses" t t)
+
 (define-advice register-val-jump-to (:around (orig val arg) adh-no-file-query-prompt)
   (if (and (consp val) (eq (car val) 'file-query))
       (cl-letf (((symbol-function 'y-or-n-p) #'always))
