@@ -482,11 +482,28 @@ The count toggles the list; a lighter opens its mode's menu."
                                  'local-map adh--ml-minor-mode-map))
                    modes " ")))))))
 
+(defvar-local adh--ml-flycheck-counts-cache nil
+  "Cached Flycheck counts as (ERRORS . COUNTS), keyed by list identity.")
+
+(defun adh--ml-clear-flycheck-counts (&optional _status)
+  "Invalidate diagnostic counts after Flycheck reports a status change."
+  (setq adh--ml-flycheck-counts-cache nil))
+
+(add-hook 'flycheck-status-changed-functions #'adh--ml-clear-flycheck-counts)
+
+(defun adh--ml-flycheck-counts ()
+  "Count the current Flycheck diagnostics once per result list."
+  (unless (and adh--ml-flycheck-counts-cache
+               (eq (car adh--ml-flycheck-counts-cache) flycheck-current-errors))
+    (setq adh--ml-flycheck-counts-cache
+          (cons flycheck-current-errors (flycheck-count-errors flycheck-current-errors))))
+  (cdr adh--ml-flycheck-counts-cache))
+
 (defun adh--segment-flycheck ()
   "Return Flycheck's non-zero counters, clean check mark or checking status."
   (when (bound-and-true-p flycheck-mode)
     (if (eq flycheck-last-status-change 'finished)
-        (let ((counts (flycheck-count-errors flycheck-current-errors))
+        (let ((counts (adh--ml-flycheck-counts))
               parts)
           (dolist (level '(error warning info))
             (when-let* ((count (alist-get level counts))

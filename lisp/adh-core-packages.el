@@ -52,10 +52,7 @@
   (advice-add 'isearch-occur :after #'adh--rename-isearch-occur-buffer))
 
 (defvar-local adh--occur-edit-changes nil
-  "Change group of the edits made since `occur-edit-mode' began.")
-
-(defvar-local adh--occur-edit-ticks nil
-  "Modification ticks of the Occur sources when `occur-edit-mode' began.")
+  "Source buffers, modification ticks, and original lines for Occur editing.")
 
 (defun adh--occur-source-buffers ()
   "Return the buffers the lines of the current Occur buffer come from."
@@ -77,67 +74,159 @@
     (remove-text-properties beg end '(face nil font-lock-face nil))))
 
 (defun adh--occur-edit-start ()
-  "Record this `occur-edit-mode' session's edits, also in the sources, for undo."
-  (dolist (buf (buffer-list))
-    (when (buffer-local-value 'adh--occur-edit-changes buf)
-      (with-current-buffer buf
-        (occur-mode)
-        (set-buffer-modified-p nil))))
-  (let ((bufs (adh--occur-source-buffers)))
-    (setq adh--occur-edit-ticks
-          (mapcar (lambda (buf) (cons buf (buffer-chars-modified-tick buf))) bufs)
-          adh--occur-edit-changes
-          (mapcan #'prepare-change-group
-                  (cons (current-buffer)
-                        (seq-remove (lambda (buf)
-                                      (or (buffer-local-value 'buffer-read-only buf)
-                                          (get-buffer-process buf)))
-                                    bufs)))))
-  (activate-change-group adh--occur-edit-changes)
-  (dolist (elt adh--occur-edit-changes)
-    (with-current-buffer (car elt)
-      (setq-local undo-limit most-positive-fixnum
-                  undo-strong-limit most-positive-fixnum
-                  undo-outer-limit nil)))
+  "Record this Occur session's source lines as they are edited."
+  (setq adh--occur-edit-changes
+        (mapcar (lambda (buf)
+                  (cons buf (list :tick (buffer-chars-modified-tick buf)
+                                  :external nil :lines nil)))
+                (adh--occur-source-buffers)))
+  (remove-hook 'after-change-functions #'occur-after-change-function t)
+  (add-hook 'after-change-functions #'adh--occur-edit-propagate nil t)
   (add-hook 'after-change-functions #'adh--occur-edit-plain-input nil t)
   (add-hook 'change-major-mode-hook #'adh--occur-edit-end nil t)
   (add-hook 'kill-buffer-hook #'adh--occur-edit-end nil t))
 
+(defun adh--occur-source-saved ()
+  "Remember source saves so abort cannot mark unsaved restored text clean."
+  (let ((source (or (buffer-base-buffer) (current-buffer))))
+    (dolist (buf (buffer-list))
+      (when-let* ((state (cdr (assq source (buffer-local-value 'adh--occur-edit-changes buf)))))
+        (plist-put state :saved t)))))
+
+(defun adh--occur-edit-propagate (beg end old-length)
+  "Propagate an Occur edit and retain the original source line.
+BEG, END and OLD-LENGTH are the arguments to `after-change-functions'."
+  (let* ((target (get-text-property
+                  (save-excursion (goto-char beg) (line-beginning-position))
+                  'occur-target))
+         (marker (if (consp target) (caar target) target))
+         (source (and (markerp marker) (marker-buffer marker)))
+         (source (and source (or (buffer-base-buffer source) source)))
+         (state (cdr (assq source adh--occur-edit-changes)))
+         new-line old-tick)
+    (when state
+      (with-current-buffer source
+        (setq old-tick (buffer-chars-modified-tick))
+        (unless (= old-tick (plist-get state :tick))
+          (plist-put state :external t))
+        (save-restriction
+          (widen)
+          (unless (plist-get state :lines)
+            (plist-put state :modified (buffer-modified-p))
+            (plist-put state :saved nil)
+            (plist-put state :hash (secure-hash 'sha1 (current-buffer))))
+          (save-excursion
+            (goto-char marker)
+            (let ((start (line-beginning-position))
+                  (finish (line-end-position)))
+              (unless (seq-some (lambda (line) (= (car line) start))
+                                (plist-get state :lines))
+                (setq new-line (list (copy-marker start)
+                                     (copy-marker finish t)
+                                     (buffer-substring start finish)))
+                (plist-put state :lines
+                           (cons new-line (plist-get state :lines)))))))))
+    (unwind-protect
+        (occur-after-change-function beg end old-length)
+      (when (and state (buffer-live-p source))
+        (let ((tick (buffer-chars-modified-tick source)))
+          (plist-put state :tick tick)
+          (when (and new-line (= old-tick tick))
+            (plist-put state :lines (delq new-line (plist-get state :lines)))
+            (set-marker (car new-line) nil)
+            (set-marker (cadr new-line) nil)))))))
+
+(defun adh--occur-restore-line (line)
+  "Restore a recorded source LINE without replacing unchanged text."
+  (let ((source (current-buffer)))
+    (with-temp-buffer
+      (insert (caddr line))
+      (let ((replacement (current-buffer)))
+        (with-current-buffer source
+          (combine-change-calls (marker-position (car line))
+              (marker-position (cadr line))
+            (let ((inhibit-modification-hooks t))
+              (replace-region-contents (car line) (cadr line) replacement))))))))
+
 (defun adh--occur-edit-end (&optional abort)
-  "Close the change group of this `occur-edit-mode' session, undoing it when ABORT."
-  (let ((changes adh--occur-edit-changes)
-        (after-change-functions nil))
-    (setq adh--occur-edit-changes nil)
-    (dolist (elt changes)
-      (when (buffer-live-p (car elt))
-        (with-demoted-errors "[adh] Occur edit: %S"
-          (if abort (cancel-change-group (list elt)) (accept-change-group (list elt))))
-        (with-current-buffer (car elt)
-          (mapc #'kill-local-variable '(undo-limit undo-strong-limit undo-outer-limit)))))))
+  "End this Occur session, restoring edited source lines when ABORT.
+Refuse to abort if a source was edited outside this Occur session."
+  (let ((edited (seq-filter (lambda (entry) (plist-get (cdr entry) :lines))
+                            adh--occur-edit-changes)))
+    (when abort
+      (dolist (entry edited)
+        (unless (and (buffer-live-p (car entry))
+                     (not (plist-get (cdr entry) :external))
+                     (= (buffer-chars-modified-tick (car entry))
+                        (plist-get (cdr entry) :tick)))
+          (user-error "Cannot abort Occur: source %s changed outside this session; finish editing and undo manually"
+                      (buffer-name (car entry))))
+        (with-current-buffer (car entry)
+          (barf-if-buffer-read-only)))
+      (let ((group (mapcan (lambda (entry) (prepare-change-group (car entry))) edited))
+            accepted)
+        (unwind-protect
+            (progn
+              (activate-change-group group)
+              (dolist (entry edited)
+                (with-current-buffer (car entry)
+                  (save-restriction
+                    (widen)
+                    (save-excursion
+                      (dolist (line (plist-get (cdr entry) :lines))
+                        (adh--occur-restore-line line)))
+                    (unless (equal (secure-hash 'sha1 (current-buffer))
+                                   (plist-get (cdr entry) :hash))
+                      (user-error "Cannot abort Occur: source %s changed outside its recorded lines"
+                                  (buffer-name)))
+                    (lock-buffer))))
+              (accept-change-group group)
+              (setq accepted t)
+              (dolist (entry edited)
+                (unless (or (plist-get (cdr entry) :modified)
+                            (plist-get (cdr entry) :saved))
+                  (with-current-buffer (car entry)
+                    (set-buffer-modified-p nil)))))
+          (unless accepted
+            (cancel-change-group group))
+          (dolist (entry edited)
+            (when (buffer-live-p (car entry))
+              (plist-put (cdr entry) :tick (buffer-chars-modified-tick (car entry))))))))
+    (dolist (entry edited)
+      (dolist (line (plist-get (cdr entry) :lines))
+        (set-marker (car line) nil)
+        (set-marker (cadr line) nil)))
+    (setq adh--occur-edit-changes nil)))
 
 (defun adh-occur-edit-abort ()
-  "Undo the edits made in `occur-edit-mode', also in the sources, and leave it."
+  "Restore this Occur session's source edits and leave editing mode.
+If a source was also edited directly, keep all edits and refuse to abort."
   (interactive)
+  (unless (derived-mode-p 'occur-edit-mode)
+    (user-error "Not editing an Occur buffer"))
   (adh--occur-edit-end t)
   (occur-cease-edit)
+  (revert-buffer nil t)
   (set-buffer-modified-p nil))
 
 (defun adh-occur-edit-save ()
   "Leave `occur-edit-mode' and save the source files edited in it."
   (interactive)
-  (let ((ticks adh--occur-edit-ticks))
-    (occur-cease-edit)
-    (set-buffer-modified-p nil)
-    (dolist (tick ticks)
-      (let ((buf (car tick)))
-        (when (and (buffer-live-p buf) (buffer-file-name buf) (buffer-modified-p buf)
-                   (/= (cdr tick) (buffer-chars-modified-tick buf)))
-          (with-current-buffer buf (save-buffer)))))))
+  (unless (derived-mode-p 'occur-edit-mode)
+    (user-error "Not editing an Occur buffer"))
+  (dolist (entry adh--occur-edit-changes)
+    (let ((buf (car entry)))
+      (when (and (plist-get (cdr entry) :lines)
+                 (buffer-live-p buf) (buffer-file-name buf) (buffer-modified-p buf))
+        (with-current-buffer buf (save-buffer)))))
+  (occur-cease-edit)
+  (set-buffer-modified-p nil))
 
 (use-package replace
   :ensure nil :defer t
   :hook
-  (occur-edit-mode . adh--occur-edit-start))
+  (occur-edit-mode . adh--occur-edit-start)
+  (after-save . adh--occur-source-saved))
 
 (defun adh-switch-dired-buffer ()
   "Switch to a Dired buffer."

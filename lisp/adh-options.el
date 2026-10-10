@@ -140,6 +140,13 @@ picker that previews the current candidate."
   :initialize #'custom-initialize-default
   :set (adh--custom-setter 'adh--apply-electric-pair))
 
+(defcustom adh-trim-trailing-whitespace t
+  "When non-nil, trim trailing whitespace on save except in Markdown.
+Set this buffer-locally to nil for other whitespace-sensitive files."
+  :group 'adhoc
+  :type 'boolean
+  :safe #'booleanp)
+
 (defcustom adh-use-which-key nil
   "When non-nil, list the keys that can follow a prefix key (which-key)."
   :group 'adhoc

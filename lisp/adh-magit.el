@@ -92,23 +92,41 @@ The candidate carries its hash in `adh-git-commit', and PROPS."
   "Return the commits of the repository, or only those that changed FILE.
 A commit that changed FILE carries its name at that commit, which differs
 before a rename, in `adh-git-files'."
-  (let (cands fields path)
-    (cl-flet ((add ()
-                (when fields
-                  (push (adh--git-commit-candidate
-                         fields 'adh-git-files (and file (list (or path file))))
-                        cands))))
-      (dolist (line (apply #'process-lines "git" "log" "--no-color" "--date=short"
-                           "--max-count=2000" (concat "--format=%x01" adh--git-commit-format)
-                           (and file (list "--name-only" "--follow" "--" file))))
-        (cond ((string-prefix-p "\1" line)
-               (add)
-               (setq fields (split-string (substring line 1) "\0")
-                     path nil))
-              ((not (string-empty-p line))
-               (setq path line))))
-      (add))
+  (let ((entries
+         (split-string
+          (apply #'adh--git-output "--literal-pathspecs" "log" "--no-color"
+                 "--date=short" "--max-count=2000" "-z"
+                 (concat "--format=%x00" adh--git-commit-format)
+                 (and file (list "--name-only" "--follow" "--" file)))
+          "\0"))
+        cands)
+    (while entries
+      (while (and entries (string-empty-p (car entries))) (pop entries))
+      (when entries
+        (let ((fields (cl-loop repeat 5 collect (pop entries)))
+              path)
+          (when file
+            (when (and entries (not (string-empty-p (car entries))))
+              (setq path (string-remove-prefix "\n" (pop entries)))))
+          (push (adh--git-commit-candidate
+                 fields 'adh-git-files (and file (list (or path file))))
+                cands))))
     (nreverse cands)))
+
+(defun adh--git-patch-file (patch)
+  "Return the destination filename in PATCH, decoding Git's quoting.
+Ignore the tab separating an unquoted filename from a patch timestamp."
+  (when (string-match "^\\+\\+\\+ \\([^\n\t]+\\)" patch)
+    (let ((path (magit-decode-git-path (match-string 1 patch))))
+      (when (string-prefix-p "b/" path)
+        (substring path 2)))))
+
+(defun adh--git-diff-base ()
+  "Return HEAD, or the empty tree's hash before the first commit.
+Compute the hash using this repository's object format, without writing
+an object or changing the index."
+  (or (magit-rev-verify "HEAD")
+      (string-trim (adh--git-output "hash-object" "-t" "tree" "--stdin"))))
 
 (defun adh--git-show-preview (cand)
   "Return a buffer with the diff of the commit candidate CAND."
@@ -117,7 +135,8 @@ before a rename, in `adh-git-files'."
            (key (list default-directory hash files))
            (hit (assoc key adh--git-show-cache))
            (text (or (cdr hit)
-                     (apply #'adh--git-output "show" "--no-color" "--stat" "--patch" hash
+                     (apply #'adh--git-output "--literal-pathspecs" "show"
+                            "--no-color" "--stat" "--patch" hash
                             (and files (cons "--" files))))))
       (setq adh--git-show-cache (cons (cons key text) (delq hit adh--git-show-cache)))
       (when (nthcdr 20 adh--git-show-cache)
@@ -138,9 +157,7 @@ Each candidate carries its patch of those lines in `adh-git-patch'."
                    (split-string (substring entry 0 eol) "\0")
                    'adh-git-patch patch
                    ;; The file's name at that commit, which differs before a rename.
-                   'adh-git-files (list (if (string-match "^\\+\\+\\+ b/\\(.*\\)$" patch)
-                                            (match-string 1 patch)
-                                          file))))))
+                   'adh-git-files (list (or (adh--git-patch-file patch) file))))))
             (split-string log "\1" t))))
 
 (defun adh--git-patch-preview (cand)
@@ -181,15 +198,16 @@ Each candidate carries its path in `adh-git-file' and its status in
      "adh-git-diff"
      (if (equal (get-text-property 0 'adh-git-status cand) "??")
          (adh--git-output "diff" "--no-color" "--no-ext-diff" "--no-index" "--" "/dev/null" file)
-       (adh--git-output "diff" "--no-color" "--no-ext-diff" "HEAD" "--" file))
+       (adh--git-output "--literal-pathspecs" "diff" "--no-color" "--no-ext-diff"
+                        (adh--git-diff-base) "--" file))
      #'diff-mode)))
 
 (defun adh--git-hunk-candidates ()
   "Return the hunks of the changes since the last commit."
   (with-temp-buffer
-    (insert (apply #'adh--git-output "-c" "core.quotePath=false" "diff" "--no-color"
-                   "--no-ext-diff" "--src-prefix=a/" "--dst-prefix=b/"
-                   (and (magit-rev-verify "HEAD") '("HEAD"))))
+    (insert (adh--git-output "diff" "--no-color"
+                            "--no-ext-diff" "--src-prefix=a/" "--dst-prefix=b/"
+                            (adh--git-diff-base)))
     (goto-char (point-min))
     (let (cands header file)
       (while (re-search-forward "^\\(diff --git \\|@@ -[0-9,]+ \\+\\([0-9]+\\)\\)" nil t)
@@ -198,8 +216,7 @@ Each candidate carries its path in `adh-git-file' and its status in
               (let ((hunks (save-excursion
                              (if (re-search-forward "^@@ " nil t) (match-beginning 0) (point-max)))))
                 (setq header (buffer-substring-no-properties start hunks)
-                      file (and (string-match "^\\+\\+\\+ b/\\(.*\\)$" header)
-                                (match-string 1 header))))
+                      file (adh--git-patch-file header)))
             (let* ((line (string-to-number (match-string 2)))
                    (end (save-excursion
                           (forward-line)
@@ -244,14 +261,14 @@ Each candidate carries its path in `adh-git-file' and its status in
                         (propertize name 'face (if remote 'magit-branch-remote 'magit-branch-local))
                         "  " (propertize date 'face 'magit-log-date)
                         "  " subject)
-                'adh-git-branch name 'adh-git-remote remote))))
+                'adh-git-branch name 'adh-git-ref ref 'adh-git-remote remote))))
          (process-lines "git" "for-each-ref" "--sort=-committerdate"
                         "--format=%(HEAD)%00%(refname)%00%(committerdate:relative)%00%(subject)"
                         "refs/heads" "refs/remotes"))))
 
 (defun adh--git-branch-preview (cand)
   "Return a buffer with the latest commits of the branch candidate CAND."
-  (when-let* ((branch (get-text-property 0 'adh-git-branch cand)))
+  (when-let* ((branch (get-text-property 0 'adh-git-ref cand)))
     (adh-picker-preview-buffer
      "adh-git-branch"
      (mapconcat (lambda (line)
@@ -477,16 +494,28 @@ In the picker, the preview shows each hunk."
 
 (defun adh-git-branches ()
   "Pick a branch and check it out; a remote one gets a local tracking branch.
+Reuse a local branch only when it tracks the selected remote branch.
 In the picker, the preview shows each branch's latest commits."
   (interactive)
   (let* ((default-directory (adh--git-toplevel))
          (cand (adh--git-read "Branches: " 'adh-git-branch (adh--git-branch-candidates)))
          (branch (get-text-property 0 'adh-git-branch cand)))
-    ;; For a remote branch, git checks out the local branch of that name, or
-    ;; creates one that tracks it.
-    (magit-run-git "checkout" (if (get-text-property 0 'adh-git-remote cand)
-                                  (substring branch (1+ (string-search "/" branch)))
-                                branch))))
+    (if (not (get-text-property 0 'adh-git-remote cand))
+        (magit-run-git "checkout" branch "--")
+      (let* ((ref (get-text-property 0 'adh-git-ref cand))
+             (remote (car (sort (seq-filter
+                                (lambda (name) (string-prefix-p (concat name "/") branch))
+                                (magit-list-remotes))
+                               (lambda (a b) (> (length a) (length b))))))
+             (local (and remote (substring branch (1+ (length remote))))))
+        (unless local
+          (user-error "No configured remote for %s" branch))
+        (if (magit-rev-verify (concat "refs/heads/" local))
+            (if (equal (magit-get-upstream-ref local) ref)
+                (magit-run-git "checkout" local "--")
+              (user-error "Local branch %s does not track %s; choose another local branch name in Magit"
+                          local branch))
+          (magit-run-git "checkout" "--track" "-b" local ref "--"))))))
 
 (defun adh-git-stash ()
   "Pick a stash and show it in Magit, where it can be applied or popped.

@@ -15,14 +15,39 @@ When nil, use `adh-compile-config' to check and compile on demand."
 (defvar adh--init-errors-p nil
   "Non-nil if any adhoc loading errors occurred during initialization.")
 
+(defvar adh--init-error-count 0
+  "Number of initialization errors, including errors caught by `use-package'.")
+
+(defun adh--record-package-error (type _message &optional level _buffer-name)
+  "Record error-level `use-package' diagnostics of TYPE and LEVEL.
+Keep the original warning visible, including errors from deferred configuration."
+  (when (and (eq (if (consp type) (car type) type) 'use-package)
+             (memq level '(:error :emergency)))
+    (setq adh--init-errors-p t
+          adh--init-error-count (1+ adh--init-error-count))))
+
+(advice-add 'display-warning :before #'adh--record-package-error)
+
 (defun adh--log-init-error (type target err)
   "Log an initialization failure of TYPE for TARGET using error data ERR.
 Return nil and mark initialization as failed."
   (let ((msg (format "[adh][error] %s %S: %s" type target (error-message-string err))))
     (message "%s" msg)
     (display-warning 'adhoc msg :error)
-    (setq adh--init-errors-p t)
+    (setq adh--init-errors-p t
+          adh--init-error-count (1+ adh--init-error-count))
     nil))
+
+(defun adh--call-with-init-report (function action error-type target)
+  "Call FUNCTION and report ACTION for TARGET if it succeeds without errors.
+ERROR-TYPE describes signaled failures.  Return nil on failure, including
+error diagnostics caught internally by `use-package'."
+  (let ((before adh--init-error-count))
+    (condition-case err
+        (when (and (funcall function) (= before adh--init-error-count))
+          (message "[adh][ok] %s %s" action target)
+          t)
+      (error (adh--log-init-error error-type target err)))))
 
 (add-hook 'emacs-startup-hook
           (lambda ()
@@ -39,24 +64,18 @@ Return nil and mark initialization as failed."
 
 (defun adh-require! (feature)
   "Require FEATURE, logging success; catch and record any load error."
-  (condition-case err
-      (progn (require feature)
-             (message "[adh][ok] Required %s" feature)
-             t)
-    (error
-     (adh--log-init-error
-      (format "Error loading feature (file: %s)"
-              (or (locate-library (symbol-name feature))
-                  "Path not found in load-path"))
-      feature err))))
+  (adh--call-with-init-report
+   (lambda () (require feature)) "Required"
+   (format "Error loading feature (file: %s)"
+           (or (locate-library (symbol-name feature))
+               "Path not found in load-path"))
+   feature))
 
 (defun adh-load! (file)
   "Load FILE from the user dir, logging errors; return t if loaded."
-  (condition-case err
-      (when (load (locate-user-emacs-file file) t)
-        (message "[adh][ok] Loaded %s" file)
-        t)
-    (error (adh--log-init-error "Failed to load file" file err))))
+  (adh--call-with-init-report
+   (lambda () (load (locate-user-emacs-file file) t))
+   "Loaded" "Failed to load file" file))
 
 (defconst adh-layout-modules
   '(adh-core-packages adh-project adh-flycheck adh-ext-packages
@@ -66,11 +85,15 @@ Return nil and mark initialization as failed."
 (defun adh-layout-ready-p ()
   "Return non-nil when the custom keybindings may load; say why otherwise."
   (when adh-use-custom-keybinds
-    (let ((missing (seq-remove #'featurep adh-layout-modules)))
-      (when missing
-        (message "[adh] Custom keybindings off; they need %s"
-                 (mapconcat #'symbol-name missing ", ")))
-      (null missing))))
+    (if adh--init-errors-p
+        (progn
+          (message "[adh] Custom keybindings off; configuration loading reported errors")
+          nil)
+      (let ((missing (seq-remove #'featurep adh-layout-modules)))
+        (when missing
+          (message "[adh] Custom keybindings off; they need %s"
+                   (mapconcat #'symbol-name missing ", ")))
+        (null missing)))))
 
 (setq native-comp-async-env-modifier-form
       '(progn
@@ -119,6 +142,8 @@ If a build is already running, return that process."
 
 (defun adh--compile-config ()
   "Start a background build without removing the previous working init."
+  (require 'adh-package-config (locate-user-emacs-file "lisp/adh-package-config.el"))
+  (require 'package)
   (let ((dir (locate-user-emacs-file "lisp/")))
     (make-process
      :name "adh-compile-config"
@@ -138,6 +163,12 @@ If a build is already running, return that process."
                            `(setq user-emacs-directory ,user-emacs-directory
                                   package-user-dir ,package-user-dir
                                   package-quickstart-file ,package-quickstart-file
+                                  package-archives ',package-archives
+                                  package-archive-priorities ',package-archive-priorities
+                                  package-pinned-packages ',package-pinned-packages
+                                  package-load-list ',package-load-list
+                                  package-directory-list ',package-directory-list
+                                  package-install-upgrade-built-in ,package-install-upgrade-built-in
                                   native-comp-jit-compilation nil))
                 ,@(when (native-comp-available-p)
                     (list "--eval" (format "(startup-redirect-eln-cache %S)"

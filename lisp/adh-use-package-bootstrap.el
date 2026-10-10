@@ -1,7 +1,6 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
-(with-eval-after-load 'package
-  (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t))
+(require 'adh-package-config)
 (require 'use-package)
 
 (defun adh-upgrade-packages (&optional query)

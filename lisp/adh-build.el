@@ -4,6 +4,8 @@
 (require 'bytecomp)
 (require 'pp)
 (require 'adh-startup (locate-user-emacs-file "lisp/adh-startup.el"))
+(require 'adh-package-config (locate-user-emacs-file "lisp/adh-package-config.el"))
+(require 'package)
 
 (defun adh--read-config-forms (file)
   "Read the Lisp forms in FILE, signalling malformed input."
@@ -69,13 +71,12 @@
                      (push `(declare-function ,function ,(format "lisp/%s.el" feature)
                                               ,@(and generated '(t t)))
                            declarations)))
-                 `(condition-case err
-                      (progn
-                        (unless (featurep ',feature)
-                          (with-suppressed-warnings ((make-local nil)) ,@body))
-                        (message "[adh][ok] Required %s" ',feature)
-                        t)
-                    (error (adh--log-init-error "Error loading bundled feature" ',feature err)))))
+                 `(adh--call-with-init-report
+                   (lambda ()
+                     (unless (featurep ',feature)
+                       (with-suppressed-warnings ((make-local nil)) ,@body))
+                     t)
+                   "Required" "Error loading bundled feature" ',feature)))
               (_ (error "Expected (adh-require! 'FEATURE), got %S" form))))
            ((or (not (consp form)) (memq (car form) '(quote function))) form)
            (t (mapcar #'expand form)))))
@@ -144,6 +145,8 @@ FILES is an alist of temporary source paths and final destination paths."
   "Generate and compile init.el and package quickstart in a fresh batch Emacs."
   (let* ((init (locate-user-emacs-file "init.el"))
          (quickstart package-quickstart-file)
+         (adh--init-errors-p nil)
+         (adh--init-error-count 0)
          staged-init staged-quickstart)
     (make-directory (file-name-directory quickstart) t)
     (unwind-protect
@@ -152,18 +155,23 @@ FILES is an alist of temporary source paths and final destination paths."
                 staged-quickstart (make-temp-file (concat quickstart ".build-") nil ".el"))
           (message "[adh] Generating init.el...")
           (adh--generate-init staged-init)
-          (message "[adh] Building package quickstart...")
-          (let ((package-quickstart-file staged-quickstart)
-                (warning-inhibit-types '((bytecomp))))
-            (require 'package)
-            (unless (package-quickstart-refresh)
-              (error "[adh] Compiling package quickstart failed"))
-            (package-activate-all))
+          (package-initialize 'no-activate)
+          (dolist (package package-alist)
+            (package-activate (car package)))
           (eval native-comp-async-env-modifier-form t)
           (message "[adh] Compiling init.el...")
           (unless (let ((byte-compile-warnings '(not noruntime)))
                     (byte-compile-file staged-init))
             (error "[adh] Compiling generated init.el failed"))
+          (when adh--init-errors-p
+            (error "[adh] Compiling generated init.el reported package errors"))
+          (message "[adh] Building package quickstart...")
+          (let ((package-quickstart-file staged-quickstart)
+                (warning-inhibit-types '((bytecomp))))
+            (unless (package-quickstart-refresh)
+              (error "[adh] Compiling package quickstart failed")))
+          (when adh--init-errors-p
+            (error "[adh] Building package quickstart reported package errors"))
           (message "[adh] Publishing compiled configuration...")
           (adh--publish-config
            (list (cons staged-quickstart quickstart)

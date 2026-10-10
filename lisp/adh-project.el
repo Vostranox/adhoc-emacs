@@ -8,9 +8,9 @@
 (declare-function project-try-vc "project" (dir))
 
 (defun adh--project-try (&optional dir)
-  "Project.el backend: DIR's project, Git-backed if its root has a .git dir."
+  "Project.el backend: DIR's project, Git-backed if its root has a .git entry."
   (when-let* ((root (adh--get-project-dir dir)))
-    (or (and (file-directory-p (expand-file-name ".git" root))
+    (or (and (file-exists-p (expand-file-name ".git" root))
              (let ((vc-handled-backends '(Git)))
                (project-try-vc root)))
         (cons 'transient (expand-file-name root)))))

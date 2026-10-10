@@ -23,6 +23,7 @@
 (declare-function ibuffer-visit-buffer "ibuffer")
 (declare-function ibuffer-visit-buffer-other-window "ibuffer")
 (declare-function ibuffer-visit-buffer-other-window-noselect "ibuffer")
+(declare-function info-initialize "info" ())
 
 ;;; override map
 
@@ -35,9 +36,6 @@
   "M-t" #'adh-project-async-shell-command-region
   "M-s" #'adh-consult-fd-project
   "M-o" #'adh-consult-zoxide)
-
-(dolist (hook '(prog-mode-hook nxml-mode-hook markdown-mode-hook markdown-ts-mode-hook))
-  (add-hook hook (lambda () (use-local-map nil))))
 
 ;;; global map
 
@@ -112,12 +110,14 @@
 (keymap-set global-map "C-x C-h" #'mark-whole-buffer)
 
 ;; C-x RET
-(keymap-set global-map "C-x RET f" #'set-buffer-file-coding-system)
-(keymap-set global-map "C-x RET o" #'adh-show-buffer-file-encoding)
+(define-keymap :keymap global-map
+  "C-x RET f" #'set-buffer-file-coding-system
+  "C-x RET o" #'adh-show-buffer-file-encoding)
 
 ;; M-g
-(keymap-set global-map "M-g f" #'consult-flycheck)
-(keymap-set global-map "M-g i" #'consult-imenu-multi)
+(define-keymap :keymap global-map
+  "M-g f" #'consult-flycheck
+  "M-g i" #'consult-imenu-multi)
 
 (keymap-set help-map "i" #'adh-consult-info)
 (keymap-set global-map "<remap> <repeat-complex-command>" #'consult-complex-command)
@@ -330,8 +330,8 @@
     '("(" . adh-scroll-down-half)
     '("{" . pop-to-mark-command)
     '("=" . backward-up-list)
-    '(">" . backward-sexp)
-    '("<" . forward-sexp)
+    '(">" . adh-backward-sexp)
+    '("<" . adh-forward-sexp)
     '("_" . adh-down-list)
     '(":" . comment-line)
     '("[" . end-of-defun)
@@ -461,7 +461,7 @@
     "l" #'clipboard-kill-ring-save))
 
 (with-eval-after-load 'flycheck
-  (keymap-set global-map "M-g f" 'flycheck-command-map)
+  (keymap-set global-map "M-g d" 'flycheck-command-map)
   (define-keymap :keymap flycheck-error-list-mode-map
     "<backspace>" #'adh-flycheck-display-diagnostic
     "." #'flycheck-error-list-previous-error

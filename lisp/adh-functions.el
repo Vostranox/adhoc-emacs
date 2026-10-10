@@ -96,42 +96,49 @@ In a prompt that a pivot opened, hand FN back to that pivot instead."
 
 (defun adh--move-lines (n)
   "Move the current line or region N lines down."
-  (let* ((use-region (use-region-p))
-         (beg (if use-region (region-beginning) (point)))
-         (end (if use-region (region-end) (point)))
-         (line-start (save-excursion (goto-char beg) (line-beginning-position)))
-         (line-end (save-excursion
-                     (goto-char end)
-                     (if (and use-region (bolp) (> end beg))
-                         (point)
-                       (line-beginning-position 2))))
-         (point-offset (- (point) line-start))
-         (mark-offset (when use-region (- (mark) line-start)))
-         (raw-text (delete-and-extract-region line-start line-end))
-         (text (if (string-suffix-p "\n" raw-text)
-                   raw-text
-                 (concat raw-text "\n"))))
-    (forward-line n)
-    (when (and (eobp) (not (bolp)))
-      (insert "\n"))
-    (let ((new-start (point)))
-      (insert text)
-      (when use-region
-        (set-mark (+ new-start mark-offset))
-        (setq deactivate-mark nil))
-      (goto-char (+ new-start point-offset)))))
+  (atomic-change-group
+    (let* ((use-region (use-region-p))
+           (beg (if use-region (region-beginning) (point)))
+           (end (if use-region (region-end) (point)))
+           (line-start (save-excursion (goto-char beg) (line-beginning-position)))
+           (line-end (save-excursion
+                       (goto-char end)
+                       (if (and use-region (bolp) (> end beg))
+                           (point)
+                         (line-beginning-position 2))))
+           (point-offset (- (point) line-start))
+           (mark-offset (when use-region (- (mark) line-start)))
+           (raw-text (delete-and-extract-region line-start line-end))
+           (text (if (string-suffix-p "\n" raw-text)
+                     raw-text
+                   (concat raw-text "\n"))))
+      (forward-line n)
+      (when (and (eobp) (not (bolp)))
+        (insert "\n"))
+      (let ((new-start (point)))
+        (insert text)
+        (when use-region
+          (set-mark (+ new-start mark-offset))
+          (setq deactivate-mark nil))
+        (goto-char (+ new-start point-offset))))))
 
 (defun adh--tmux-capture (buffer &optional history target)
   "Capture tmux TARGET into BUFFER, with its full HISTORY when non-nil.
 TARGET defaults to `adh-tmux-session'."
   (let ((cmd (split-string adh--tmux-command))
         (target (or target adh-tmux-session)))
-    (with-current-buffer (get-buffer-create buffer)
-      (erase-buffer)
-      (apply #'call-process (car cmd) nil t nil
-             (append (cdr cmd) '("capture-pane" "-p")
-                     (and target (list "-t" target))
-                     (and history '("-S" "-")))))
+    (with-temp-buffer
+      (let ((status (apply #'call-process (car cmd) nil t nil
+                           (append (cdr cmd) '("capture-pane" "-p")
+                                   (and target (list "-t" target))
+                                   (and history '("-S" "-"))))))
+        (unless (eq status 0)
+          (user-error "Tmux capture failed (%s): %s" status (string-trim (buffer-string))))
+        (let ((text (buffer-string)))
+          (with-current-buffer (get-buffer-create buffer)
+            (atomic-change-group
+              (erase-buffer)
+              (insert text))))))
     (switch-to-buffer buffer)
     (goto-char (point-max))
     (skip-chars-backward " \t\n")))
@@ -517,7 +524,7 @@ TARGET defaults to `adh-tmux-session'."
   (interactive)
   (let ((path (adh--tmux-directory)))
     (adh--tmux-run "adh-tmux-cd" (or target adh-tmux-session)
-                   (concat "cd " (shell-quote-argument path)))
+                   (concat "cd " (shell-quote-argument path t)))
     (when (called-interactively-p 'interactive)
       (message "Tmux directory -> '%s'" path))
     path))
@@ -525,7 +532,8 @@ TARGET defaults to `adh-tmux-session'."
 (defun adh-tmux-send-region (beg end &optional target)
   "Run the text between BEG and END in tmux TARGET, like `compile'.
 The tmux shell first changes to Emacs's current directory and clears
-its screen, then runs the text.  TARGET defaults to `adh-tmux-session'.
+its screen, then runs the text.  A failed directory change prevents
+execution.  TARGET defaults to `adh-tmux-session'.
 Interactively, send the active region, or the current line if there is
 none; with a prefix argument, prompt for TARGET."
   (interactive
@@ -540,8 +548,9 @@ none; with a prefix argument, prompt for TARGET."
     (when (string= text "")
       (user-error "Nothing to send to tmux"))
     (adh--tmux-run "adh-tmux-send" dest
-                   (format "cd %s && clear" (shell-quote-argument path))
-                   text)
+                   (format "cd %s && eval %s"
+                           (shell-quote-argument path t)
+                           (shell-quote-argument (concat "clear\n" text "\n") t)))
     (when (called-interactively-p 'interactive)
       (message "tmux %s in %s <- %s" (or dest "current")
                (abbreviate-file-name path) text))

@@ -137,9 +137,18 @@ IGNORE-CASE controls whether highlighting ignores case."
         cache)
     (lambda (input)
       (let* ((consult--regexp-compiler #'adh--consult-pcre-compiler)
-             (words (split-string (string-replace "\\ " "\0" input) " "))
+             (split (consult--command-split input))
+             (words (split-string (string-replace "\\ " "\0" (car split)) " "))
              (rel (seq-filter (lambda (w) (string-match-p "\\`\\.\\.?/" w)) words))
-             (rest (string-replace "\0" "\\ " (string-join (seq-difference words rel) " "))))
+             (rest (concat
+                    (replace-regexp-in-string
+                     "\\(^\\| \\)-" "\\1\\\\-"
+                     (string-replace "\0" "\\ "
+                                     (string-join (seq-difference words rel) " ")))
+                    (when (cdr split)
+                      (concat " " (mapconcat (lambda (option)
+                                               (shell-quote-argument option t))
+                                             (cdr split) " "))))))
         (if (not rel)
             (funcall builder input)
           (condition-case err

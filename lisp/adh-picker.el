@@ -78,7 +78,12 @@
   :type '(repeat symbol))
 
 (defcustom adh-picker-preview-max-size (* 512 1024)
-  "Number of bytes the preview reads from a file that is not visited."
+  "Maximum uncompressed bytes previewed from a file that is not visited."
+  :group 'adh-picker
+  :type 'natnum)
+
+(defcustom adh-picker-preview-match-limit 128
+  "Maximum number of match overlays in a picker preview."
   :group 'adh-picker
   :type 'natnum)
 
@@ -146,6 +151,10 @@
 
 (defvar adh--picker-file-buffers nil
   "Cached file previews, most recent first, as (FILE MODTIME . BUFFER).")
+
+(defvar adh--picker-indirect-buffers nil
+  "Pairs of narrowed source buffers and widened indirect previews.
+These share live text with their sources and are discarded on closing.")
 
 (defvar-local adh--picker-partial nil
   "Non-nil in a file preview that holds only the start of its file.")
@@ -338,6 +347,10 @@ Only what changed since the last prompt is set, e.g. after a theme switch."
     (make-frame-invisible adh--picker-frame t))
   (when (window-live-p adh--picker-preview-window)
     (set-window-buffer adh--picker-preview-window (adh--picker-scratch)))
+  (dolist (entry adh--picker-indirect-buffers)
+    (when (buffer-live-p (cdr entry))
+      (kill-buffer (cdr entry))))
+  (setq adh--picker-indirect-buffers nil)
   (setq adh--picker-shown 'none))
 
 (defun adh--picker-fill (fn)
@@ -356,29 +369,94 @@ Only what changed since the last prompt is set, e.g. after a theme switch."
   "Return the scratch buffer showing TEXT."
   (adh--picker-fill (lambda () (insert text))))
 
+(defun adh--picker-insert-gzip (file)
+  "Insert bounded uncompressed contents of FILE; return non-nil if truncated.
+Stop the external decoder at the preview limit or after one second."
+  (let ((program (or (executable-find "gzip")
+                     (error "Install gzip to preview compressed files")))
+        (file (expand-file-name file))
+        (destination (current-buffer))
+        (limit (+ 4 adh-picker-preview-max-size))
+        (deadline (+ (float-time) 1.0))
+        (errors (generate-new-buffer " *adh-picker-gzip-errors*"))
+        proc)
+    (unwind-protect
+        (with-temp-buffer
+          (set-buffer-multibyte nil)
+          (let ((output (current-buffer))
+                (default-directory temporary-file-directory))
+            (setq proc
+                  (make-process
+                   :name "adh-picker-gzip" :buffer nil :noquery t
+                   :connection-type 'pipe :coding 'no-conversion :stderr errors
+                   :command (list program "-cd" "--" file)
+                   :sentinel #'ignore
+                   :filter (lambda (process chunk)
+                             (with-current-buffer output
+                               (insert (substring chunk 0 (min (length chunk)
+                                                               (- limit (buffer-size)))))
+                               (when (>= (buffer-size) limit)
+                                 (delete-process process)))))))
+          (while (and (process-live-p proc) (< (float-time) deadline))
+            (accept-process-output proc 0.01))
+          (when (process-live-p proc)
+            (error "Compressed preview timed out"))
+          (let ((partial (> (buffer-size) adh-picker-preview-max-size)))
+            (unless (or partial (eq (process-exit-status proc) 0))
+              (error "Cannot decompress preview: %s"
+                     (with-current-buffer errors (string-trim (buffer-string)))))
+            (let* ((raw (buffer-string))
+                   (requested (or coding-system-for-read 'undecided))
+                   (coding requested))
+              (when (eq (coding-system-type requested) 'undecided)
+                (setq coding (detect-coding-string raw t))
+                (when (and (= (length raw) limit)
+                           (not (eq (coding-system-type coding) 'utf-8)))
+                  (setq coding
+                        (or (cl-loop for trim from 1 to 3
+                                     for candidate = (detect-coding-string
+                                                      (substring raw 0 (- (length raw) trim)) t)
+                                     when (eq (coding-system-type candidate) 'utf-8)
+                                     return candidate)
+                            coding)))
+                (when (integerp (coding-system-eol-type requested))
+                  (setq coding (coding-system-change-eol-conversion
+                                coding (coding-system-eol-type requested)))))
+              (let* ((text (decode-coding-string
+                            (substring raw 0 (min (length raw) adh-picker-preview-max-size))
+                            coding))
+                     (end (length text)))
+                (when (and partial (eq (coding-system-type coding) 'utf-8))
+                  (while (and (> end 0) (> (aref text (1- end)) #x10ffff))
+                    (setq end (1- end))))
+                (with-current-buffer destination (insert (substring text 0 end)))))
+            partial))
+      (when (and proc (process-live-p proc))
+        (delete-process proc))
+      (kill-buffer errors))))
+
 (defun adh--picker-read-file (file)
   "Insert the start of FILE into the current buffer, set up for display."
-  (condition-case err
-      (progn
-        (let ((size (or (file-attribute-size (file-attributes file)) 0))
-              (file-name-handler-alist nil))
-          (if (not (string-suffix-p ".gz" file))
-              (progn
-                (insert-file-contents file nil 0 adh-picker-preview-max-size)
-                (setq adh--picker-partial (> size adh-picker-preview-max-size)))
-            (when (> size adh-picker-preview-max-size)
-              (error "Compressed file too large to preview"))
-            (let ((file-name-handler-alist '(("\\.gz\\'" . jka-compr-handler))))
-              (insert-file-contents file))))
-        (if (save-excursion (goto-char (point-min))
-                            (search-forward "\0" (min (point-max) 8000) t))
-            (progn (erase-buffer) (insert "Binary file"))
-          (let ((buffer-file-name file))
-            (delay-mode-hooks (ignore-errors (set-auto-mode))))
-          (ignore-errors
-            (font-lock-set-defaults)
-            (jit-lock-register #'font-lock-fontify-region))))
-    (error (erase-buffer) (insert (error-message-string err))))
+  (let (partial)
+    (condition-case err
+        (progn
+          (let ((size (or (file-attribute-size (file-attributes file)) 0))
+                (file-name-handler-alist nil))
+            (if (not (string-suffix-p ".gz" file))
+                (progn
+                  (insert-file-contents file nil 0 adh-picker-preview-max-size)
+                  (setq partial (> size adh-picker-preview-max-size)))
+              (setq partial (adh--picker-insert-gzip file))))
+          (if (save-excursion (goto-char (point-min))
+                              (search-forward "\0" (min (point-max) 8000) t))
+              (progn (erase-buffer) (insert "Binary file"))
+            (let ((buffer-file-name file))
+              (delay-mode-hooks (ignore-errors (set-auto-mode))))
+            (ignore-errors
+              (font-lock-set-defaults)
+              (jit-lock-register #'font-lock-fontify-region))))
+      (error (setq partial nil) (erase-buffer) (insert (error-message-string err))))
+    (setq-local adh--picker-partial partial))
   (setq-local truncate-lines t)
   (setq buffer-read-only t))
 
@@ -436,17 +514,39 @@ Only what changed since the last prompt is set, e.g. after a theme switch."
 (defun adh--picker-search-pos (buffer regexp)
   "Return the start of the first line in BUFFER that matches REGEXP, or nil."
   (with-current-buffer buffer
-    (save-excursion
-      (goto-char (point-min))
-      (and (re-search-forward regexp nil t) (pos-bol)))))
+    (save-restriction
+      (widen)
+      (save-excursion
+        (goto-char (point-min))
+        (and (re-search-forward regexp nil t) (pos-bol))))))
 
 (defun adh--picker-line-pos (buffer line)
   "Return the position of LINE in BUFFER."
   (with-current-buffer buffer
-    (save-excursion
-      (goto-char (point-min))
-      (forward-line (1- (max 1 line)))
-      (point))))
+    (save-restriction
+      (widen)
+      (save-excursion
+        (goto-char (point-min))
+        (forward-line (1- (max 1 line)))
+        (point)))))
+
+(defun adh--picker-buffer-view (buffer pos)
+  "Return BUFFER, widening an indirect view only when POS is inaccessible."
+  (with-current-buffer buffer
+    (if (or (not pos) (not (buffer-narrowed-p)) (<= (point-min) pos (point-max)))
+        buffer
+      (let ((view (cdr (assq buffer adh--picker-indirect-buffers))))
+        (unless (buffer-live-p view)
+          (setq view (make-indirect-buffer buffer
+                                          (generate-new-buffer-name " *adh-picker-view*")
+                                          t t))
+          (push (cons buffer view) adh--picker-indirect-buffers)
+          (with-current-buffer view
+            (setq-local buffer-read-only t
+                        kill-buffer-hook nil
+                        kill-buffer-query-functions nil)))
+        (with-current-buffer view (widen))
+        view))))
 
 (defun adh--picker-visiting (file)
   "Return the buffer visiting FILE, never contacting a remote host."
@@ -466,16 +566,18 @@ Only what changed since the last prompt is set, e.g. after a theme switch."
   "Turn TARGET into a list (BUFFER POS TITLE) to show."
   (pcase target
     (`(buffer ,buf ,pos)
-     (list buf (or pos (with-current-buffer buf (point))) (buffer-name buf)))
+     (list (adh--picker-buffer-view buf pos)
+           (or pos (with-current-buffer buf (point))) (buffer-name buf)))
     (`(file ,file ,line . ,search)
      (let ((title (abbreviate-file-name file)))
        (cond
         ((file-remote-p file) (list (adh--picker-text "Remote file") nil title))
         ((file-directory-p file) (list (adh--picker-dir-buffer file) nil title))
         ((not (file-readable-p file)) (list (adh--picker-text "") nil title))
-        (t (let ((buf (or (adh--picker-visiting file) (adh--picker-file-buffer file))))
-             (list buf (cond (line (adh--picker-line-pos buf line))
-                             (search (adh--picker-search-pos buf (car search))))
+        (t (let* ((buf (or (adh--picker-visiting file) (adh--picker-file-buffer file)))
+                  (pos (cond (line (adh--picker-line-pos buf line))
+                             (search (adh--picker-search-pos buf (car search))))))
+             (list (adh--picker-buffer-view buf pos) pos
                    (if (buffer-local-value 'adh--picker-partial buf)
                        (format "%s  (first %s)" title
                                (file-size-human-readable adh-picker-preview-max-size))
@@ -486,7 +588,8 @@ Only what changed since the last prompt is set, e.g. after a theme switch."
            (preview (let ((default-directory dir)) (funcall fn cand))))
        (pcase preview
          ((pred bufferp) (list preview nil title))
-         (`(,(and (pred bufferp) buf) . ,(and (pred integerp) pos)) (list buf pos title))
+         (`(,(and (pred bufferp) buf) . ,(and (pred integerp) pos))
+          (list (adh--picker-buffer-view buf pos) pos title))
          ((pred stringp) (list (adh--picker-text preview) nil title))
          (_ (list (adh--picker-text "") nil title)))))
     (_ (list (adh--picker-text "") nil ""))))
@@ -524,7 +627,8 @@ Only what changed since the last prompt is set, e.g. after a theme switch."
     (let ((file (expand-file-name file)))
       (if-let* ((buf (adh--picker-visiting file))
                 (pos (bookmark-get-position name)))
-          (list 'buffer buf (min pos (with-current-buffer buf (point-max))))
+          (list 'buffer buf (min pos (with-current-buffer buf
+                                      (save-restriction (widen) (point-max)))))
         (list 'file file nil)))))
 
 (defun adh--picker-xref-target (item)
@@ -609,18 +713,23 @@ Only what changed since the last prompt is set, e.g. after a theme switch."
     (delete-dups strings)))
 
 (defun adh--picker-highlight-matches (win strings)
-  "Highlight STRINGS on the current line of the current buffer, in window WIN."
-  (let ((eol (pos-eol))
-        (case-fold-search t))
+  "Highlight STRINGS near point in WIN with bounded scanning and overlays."
+  (let* ((width (min 1024 (max 1 (window-body-width win))))
+         (beg (max (pos-bol) (- (point) (* 2 width))))
+         (end (min (pos-eol) (+ beg (* 4 width))))
+         (remaining adh-picker-preview-match-limit)
+         (case-fold-search t))
     (dolist (string strings)
-      (save-excursion
-        (goto-char (pos-bol))
-        (while (search-forward string eol t)
-          (let ((ov (make-overlay (match-beginning 0) (match-end 0))))
-            (overlay-put ov 'face 'adh-picker-preview-match)
-            (overlay-put ov 'window win)
-            (overlay-put ov 'priority 1001)
-            (push ov adh--picker-match-overlays)))))))
+      (unless (string-empty-p string)
+        (save-excursion
+          (goto-char beg)
+          (while (and (> remaining 0) (search-forward string end t))
+            (let ((ov (make-overlay (match-beginning 0) (match-end 0))))
+              (overlay-put ov 'face 'adh-picker-preview-match)
+              (overlay-put ov 'window win)
+              (overlay-put ov 'priority 1001)
+              (push ov adh--picker-match-overlays)
+              (setq remaining (1- remaining)))))))))
 
 (defun adh--picker-clear-matches ()
   "Delete the overlays marking the input's matches in the preview."

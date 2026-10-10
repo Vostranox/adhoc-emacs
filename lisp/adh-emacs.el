@@ -73,18 +73,32 @@ Return nil on a terminal or if the font is missing."
       (let ((inhibit-read-only t))
         (put-text-property (point-min) (1+ (point-min)) 'first-completion t)))))
 
-(define-advice forward-sexp (:around (orig &rest args) adh-syntax-only)
+(defun adh-forward-sexp (&optional arg)
+  "Move forward ARG sexps using the syntax table for layout navigation."
+  (interactive "^p")
   (let ((forward-sexp-function nil))
-    (apply orig args)))
+    (forward-sexp arg)))
+
+(defun adh-backward-sexp (&optional arg)
+  "Move backward ARG sexps using the syntax table for layout navigation."
+  (interactive "^p")
+  (adh-forward-sexp (- (or arg 1))))
+
+(defun adh--cleanup-whitespace ()
+  "Trim trailing whitespace when enabled, preserving Markdown hard breaks."
+  (when (and adh-trim-trailing-whitespace
+             (not (derived-mode-p 'markdown-mode 'markdown-ts-mode)))
+    (delete-trailing-whitespace)))
 
 (define-advice read-buffer-to-switch (:filter-args (_args) adh-short-prompt)
   (list "Switch to: "))
 
 (define-advice list-buffers--refresh (:after (&rest _) adh-minimal)
-  (setq tabulated-list-format (seq-remove-at-position tabulated-list-format 4)
-        tabulated-list-entries
-        (mapcar (lambda (e) (list (car e) (seq-remove-at-position (cadr e) 4)))
-                tabulated-list-entries)))
+  (setq tabulated-list-format (seq-remove-at-position tabulated-list-format 4))
+  (dolist (entry tabulated-list-entries)
+    (setf (cadr entry) (seq-remove-at-position (cadr entry) 4)))
+  (when (equal (car tabulated-list-sort-key) "Size")
+    (setq tabulated-list-sort-key nil)))
 
 (define-advice tabulated-list-init-header (:after () adh-buffer-menu)
   (when (derived-mode-p 'Buffer-menu-mode)
@@ -222,7 +236,7 @@ Return nil on a terminal or if the font is missing."
   (compilation-mode . (lambda () (setq-local scroll-conservatively 101)))
   (compilation-start . (lambda (_) (window--adjust-process-windows)))
   (completion-setup . adh--completions-preselect-first)
-  (before-save . delete-trailing-whitespace))
+  (before-save . adh--cleanup-whitespace))
 
 (provide 'adh-emacs)
 
