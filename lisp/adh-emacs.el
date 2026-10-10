@@ -232,6 +232,7 @@ Return nil on a terminal or if the font is missing."
   (emacs-startup . (lambda () (tab-bar-rename-tab "dev") (message "[adh] Activated %d packages in %s" (length package-activated-list) (emacs-init-time))))
   (find-file-not-found-functions . adh--create-parent-dir-on-the-fly)
   (text-mode . visual-line-mode)
+  (minibuffer-setup . (lambda () (setq-local yank-excluded-properties t)))
   (completion-list-mode . (lambda () (display-line-numbers-mode -1)))
   (compilation-mode . (lambda () (setq-local scroll-conservatively 101)))
   (compilation-start . (lambda (_) (window--adjust-process-windows)))
