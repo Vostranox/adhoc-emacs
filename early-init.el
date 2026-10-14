@@ -48,6 +48,8 @@
   (require 'adh-startup)
   (require 'adh-options))
 
+(adh-load! "adh-custom-pre-init.el")
+
 (setq default-frame-alist
       `((fullscreen . maximized)
         (undecorated . ,(not adh-window-decoration))

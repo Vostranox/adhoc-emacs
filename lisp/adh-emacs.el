@@ -21,7 +21,17 @@ Return nil on a terminal or if the font is missing."
 
 (defun adh--apply-window-decoration (decorated)
   "Show or hide the window-manager frame decorations per DECORATED."
-  (adh--apply-frame-parameter 'undecorated (not decorated)))
+  (let* ((undecorated (not decorated))
+         (maximized (seq-filter
+                     (lambda (frame)
+                       (and (eq (framep frame) 'ns)
+                            (eq (frame-parameter frame 'fullscreen) 'maximized)
+                            (xor (frame-parameter frame 'undecorated) undecorated)))
+                     (frame-list))))
+    (adh--apply-frame-parameter 'undecorated undecorated)
+    (dolist (frame maximized)
+      (set-frame-parameter frame 'fullscreen nil)
+      (set-frame-parameter frame 'fullscreen 'maximized))))
 
 (defun adh--apply-frame-opacity (opacity)
   "Set frame OPACITY (0-100); background only, except on Windows and macOS."

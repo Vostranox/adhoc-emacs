@@ -2,8 +2,6 @@
 
 (adh-require! 'adh-options)
 
-(adh-load! "adh-custom-pre-init.el")
-
 (adh-require! 'adh-functions)
 (adh-require! 'adh-use-package-bootstrap)
 (adh-require! 'adh-emacs)

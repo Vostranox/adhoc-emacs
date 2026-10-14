@@ -44,9 +44,11 @@ Run `install.sh` from a Bash-compatible shell, such as Git Bash.
 
 ## Configuration
 
-`init.el` loads the following untracked files if they exist:
+The configuration loads the following untracked files if they exist:
 
-- `adh-custom-pre-init.el` — Loaded at the beginning of `init.el`.
+- `adh-custom-pre-init.el` — Loaded from `early-init.el`, before the first
+  frame is created, so frame options such as `adh-window-decoration` apply
+  to it.
 - `adh-custom-post-init.el` — Loaded at the end of `init.el`.
 
 Use these files for local customization. Examples are available in `examples/`.
