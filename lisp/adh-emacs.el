@@ -4,7 +4,6 @@
 (require 'adh-functions)
 
 (defvar ns-use-proxy-icon)
-
 (defvar vertico-count)
 
 (defun adh--apply-font (family height &optional frame)
@@ -194,7 +193,6 @@ Return nil on a terminal or if the font is missing."
     (set-terminal-coding-system 'utf-8-unix)
     (set-keyboard-coding-system 'utf-8-unix))
 
-  (add-to-list 'default-frame-alist '(fullscreen . maximized))
   (when (eq system-type 'darwin)
     (setq ns-use-proxy-icon nil
           frame-resize-pixelwise t)

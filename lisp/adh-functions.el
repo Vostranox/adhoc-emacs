@@ -2,14 +2,16 @@
 
 (require 'adh-options)
 
+(defvar adh--minibuffer-pivot-depth nil
+  "Minibuffer depth of the prompt a pivot opened, while it is active.")
+(defvar adh--command-origin-dir nil
+  "Directory a project command was invoked from, before moving to the root.")
 (defconst adh--tmux-command (if (eq system-type 'windows-nt) "wsl -e tmux" "tmux")
   "Shell command used to talk to tmux (via WSL on Windows).")
 (defconst adh--fd-program (locate-user-emacs-file (concat "opt/fd/bin/fd" (when (eq system-type 'windows-nt) ".exe")))
   "The fd fork that install.sh builds.")
 (defconst adh--minibuffer-pivot-delay 0.000001
   "Idle seconds before `adh--minibuffer-pivot-call' reopens the minibuffer.")
-(defvar adh--minibuffer-pivot-depth nil
-  "Minibuffer depth of the prompt a pivot opened, while it is active.")
 (defvar-keymap adh-override-map
   :doc "Keys above every major and minor mode map, see `adh-override-mode'.")
 
@@ -34,13 +36,6 @@ Re-evaluating the form updates NAME in place."
        (defvar-keymap ,name)
        (define-keymap :keymap ,name ,@body)
        (keymap-set ,parent ,key ,name))))
-
-(define-minor-mode adh-override-mode
-  "Keep `adh-override-map' above every major and minor mode map."
-  :global t :init-value t :group 'adhoc)
-
-(add-to-list 'emulation-mode-map-alists `((adh-override-mode . ,adh-override-map)))
-(add-hook 'minibuffer-setup-hook (lambda () (setq-local adh-override-mode nil)))
 
 (defun adh--minibuffer-pivot-call (fn)
   "Abort the minibuffer, then call FN once Emacs is idle.
@@ -587,9 +582,6 @@ none; with a prefix argument, prompt for TARGET."
         (signal-process pid sig)
         (message "Sent %s to %d" sig pid)))))
 
-(defvar adh--command-origin-dir nil
-  "Directory a project command was invoked from, before moving to the root.")
-
 (defun adh--origin-dir ()
   "Directory the current command started from, before any move to a root.
 Falls back to the directory of the file or Dired buffer the minibuffer serves."
@@ -627,6 +619,13 @@ Uses the current file's directory, the Dired directory, or the buffer's
      (list (completing-read (format-prompt "Switch tab" (car recent))
                             recent nil nil nil nil recent))))
   (tab-bar-switch-to-tab name))
+
+(define-minor-mode adh-override-mode
+  "Keep `adh-override-map' above every major and minor mode map."
+  :global t :init-value t :group 'adhoc)
+
+(add-to-list 'emulation-mode-map-alists `((adh-override-mode . ,adh-override-map)))
+(add-hook 'minibuffer-setup-hook (lambda () (setq-local adh-override-mode nil)))
 
 (provide 'adh-functions)
 

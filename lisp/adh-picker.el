@@ -156,9 +156,6 @@
   "Pairs of narrowed source buffers and widened indirect previews.
 These share live text with their sources and are discarded on closing.")
 
-(defvar-local adh--picker-partial nil
-  "Non-nil in a file preview that holds only the start of its file.")
-
 (defvar adh--picker-imenu-items nil
   "Items of the last `consult-imenu' prompt, which hold their positions.")
 
@@ -172,6 +169,9 @@ These share live text with their sources and are discarded on closing.")
   '(vertico-buffer-display-action vertico-buffer-hide-prompt mode-line-format
                                   marginalia-field-width marginalia-annotators)
   "Variables the picker sets locally in the minibuffer.")
+
+(defvar-local adh--picker-partial nil
+  "Non-nil in a file preview that holds only the start of its file.")
 
 (defun adh--picker-parent ()
   "Return the frame the picker floats over."

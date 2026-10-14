@@ -3,15 +3,19 @@
 (require 'adh-options)
 (require 'adh-functions)
 
-(declare-function yas-exit-all-snippets "yasnippet")
 (defvar eglot-server-programs)
 (defvar eglot-stay-out-of)
+
+(declare-function yas-exit-all-snippets "yasnippet")
 
 (defvar adh--eglot-pending-servers nil
   "Server registrations to apply when Eglot loads, newest first.")
 
 (defvar adh--eglot-global-enabled nil
   "Non-nil when eglot auto-starts in supported `prog-mode' buffers.")
+
+(defvar-local adh--eldoc-mode-before-eglot 'unknown
+  "`eldoc-mode' before eglot took over eldoc, or `unknown'.")
 
 (defun adh--eglot-managed-buffers ()
   "Return the buffers eglot currently manages."
@@ -31,9 +35,6 @@
     (when (and (memq 'yas features) (bound-and-true-p yas-minor-mode))
       (yas-exit-all-snippets)
       (yas-minor-mode -1))))
-
-(defvar-local adh--eldoc-mode-before-eglot 'unknown
-  "`eldoc-mode' before eglot took over eldoc, or `unknown'.")
 
 (defun adh--eglot-settle-eldoc (buf)
   "Restore `eldoc-mode' in BUF to its state before eglot."

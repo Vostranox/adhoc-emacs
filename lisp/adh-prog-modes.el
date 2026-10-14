@@ -6,6 +6,10 @@
 
 (declare-function treesit-auto--build-treesit-source-alist "treesit-auto")
 
+(defun adh--treesit-no-error-face ()
+  "Don't paint tree-sitter ERROR nodes; incomplete code isn't an error."
+  (treesit-font-lock-recompute-features nil '(error)))
+
 (defun adh-treesit-ensure-grammars ()
   "Install the missing grammars in `adh-treesit-ensured-langs', skipping failures."
   (interactive)
@@ -29,9 +33,9 @@
                '(zig "https://github.com/tree-sitter-grammars/tree-sitter-zig"))
   (add-to-list 'treesit-major-mode-remap-alist '(zig-mode . zig-ts-mode))
   (add-to-list 'treesit-major-mode-remap-alist '(glsl-mode . glsl-ts-mode))
-  (customize-set-variable 'treesit-enabled-modes
-                          (seq-difference (mapcar #'cdr treesit-major-mode-remap-alist)
-                                          adh-treesit-excluded-modes)))
+  (funcall (get 'treesit-enabled-modes 'custom-set) 'treesit-enabled-modes
+           (seq-difference (mapcar #'cdr treesit-major-mode-remap-alist)
+                           adh-treesit-excluded-modes)))
 
 (use-package c-ts-mode
   :ensure nil :defer t
@@ -40,10 +44,6 @@
   (c-ts-mode-indent-style 'bsd)
   :hook
   (c-ts-mode . (lambda () (setq-local comment-start "// ") (setq-local comment-end ""))))
-
-(defun adh--treesit-no-error-face ()
-  "Don't paint tree-sitter ERROR nodes; incomplete code isn't an error."
-  (treesit-font-lock-recompute-features nil '(error)))
 
 (use-package rust-ts-mode
   :ensure nil :defer t

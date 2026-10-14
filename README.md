@@ -31,8 +31,9 @@ The installer builds and installs a custom
 [fd](https://github.com/Vostranox/fd/tree/simple_sort_by_depth) binary
 under `~/.emacs.d/opt/fd`.
 
-Package installation and `init.el` generation are handled by `config.el`.
-You can recompile the configuration at any time by running `M-x adh-compile-config`.
+The installer also byte-compiles and native-compiles `lisp/`. After editing
+`lisp/`, run `M-x adh-compile-config` to recompile it for the next session;
+until then, edited modules load from source.
 
 ### Windows Setup
 
@@ -43,7 +44,7 @@ Run `install.sh` from a Bash-compatible shell, such as Git Bash.
 
 ## Configuration
 
-The generated `init.el` loads the following untracked files if they exist:
+`init.el` loads the following untracked files if they exist:
 
 - `adh-custom-pre-init.el` — Loaded at the beginning of `init.el`.
 - `adh-custom-post-init.el` — Loaded at the end of `init.el`.
