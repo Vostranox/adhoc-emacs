@@ -8,7 +8,8 @@
 (unless (eq system-type 'darwin)
   (setq frame-inhibit-implied-resize t))
 
-(setq inhibit-startup-message t)
+(setq inhibit-startup-message t
+      inhibit-default-init t)
 (defun display-startup-echo-area-message ()
   (message ""))
 
@@ -43,4 +44,15 @@
     (error (message "Failed to load theme: %s" (error-message-string err)))))
 
 (add-to-list 'load-path (locate-user-emacs-file "lisp"))
-(require 'adh-startup (locate-user-emacs-file "lisp/adh-startup.el"))
+(let ((load-prefer-newer t))
+  (require 'adh-startup)
+  (require 'adh-options))
+
+(setq default-frame-alist
+      `((fullscreen . maximized)
+        (undecorated . ,(not adh-window-decoration))
+        (,(if (memq system-type '(windows-nt darwin)) 'alpha 'alpha-background)
+         . ,adh-frame-opacity)
+        ,@default-frame-alist))
+(set-face-attribute 'default nil :family adh-mono-spaced-font :height adh-mono-spaced-font-size)
+(set-face-attribute 'fixed-pitch nil :family adh-mono-spaced-font)

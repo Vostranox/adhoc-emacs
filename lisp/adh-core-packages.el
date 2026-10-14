@@ -2,13 +2,11 @@
 
 (require 'adh-functions)
 
-(declare-function glasses-mode--set-explicitly "glasses" t t)
+(defvar ls-lisp-use-insert-directory-program)
+(defvar adh-global-glasses-mode)
 
-(define-advice register-val-jump-to (:around (orig val arg) adh-no-file-query-prompt)
-  (if (and (consp val) (eq (car val) 'file-query))
-      (cl-letf (((symbol-function 'y-or-n-p) #'always))
-        (funcall orig val arg))
-    (funcall orig val arg)))
+(defvar-local adh--occur-edit-changes nil
+  "Source buffers, modification ticks, and original lines for Occur editing.")
 
 (defun adh--rename-isearch-occur-buffer (&rest _)
   "Name the `isearch-occur' buffer after the search string."
@@ -24,35 +22,6 @@
         (isearch-mode forward)
         (isearch-yank-string search-string))
     (call-interactively (if forward #'isearch-forward #'isearch-backward))))
-
-(defun adh-isearch-forward-with-region ()
-  "Search forward, starting from the active region if any."
-  (interactive)
-  (adh--isearch-with-region t))
-
-(defun adh-isearch-backward-with-region ()
-  "Search backward, starting from the active region if any."
-  (interactive)
-  (adh--isearch-with-region nil))
-
-(defun adh-isearch-occur ()
-  "Run `occur' on the current isearch and exit isearch."
-  (interactive)
-  (call-interactively #'isearch-occur)
-  (isearch-done))
-
-(use-package isearch
-  :ensure nil
-  :custom
-  (isearch-lazy-count t)
-  (isearch-case-fold-search t)
-  (search-whitespace-regexp ".*?")
-  (lazy-count-prefix-format "(%s/%s) ")
-  :config
-  (advice-add 'isearch-occur :after #'adh--rename-isearch-occur-buffer))
-
-(defvar-local adh--occur-edit-changes nil
-  "Source buffers, modification ticks, and original lines for Occur editing.")
 
 (defun adh--occur-source-buffers ()
   "Return the buffers the lines of the current Occur buffer come from."
@@ -198,6 +167,67 @@ Refuse to abort if a source was edited outside this Occur session."
         (set-marker (cadr line) nil)))
     (setq adh--occur-edit-changes nil)))
 
+(defun adh--dired-rename-buffer ()
+  "Name a Dired buffer PROJECT/REL/ inside a project, else by its path."
+  (unless (bound-and-true-p dirvish-fd-buffer)
+    (let ((root (adh--get-project-dir)))
+      (rename-buffer
+       (if root
+           (let ((rel (file-relative-name default-directory root)))
+             (concat (file-name-nondirectory (directory-file-name root)) "/"
+                     (unless (equal rel "./") rel)))
+         (abbreviate-file-name default-directory))
+       t))))
+
+(defun adh--apply-vc (on)
+  "Turn the built-in VC backends and `global-diff-hl-mode' ON or off."
+  (if on
+      (progn
+        (setq vc-handled-backends '(RCS CVS SVN SCCS SRC Bzr Git Hg))
+        (dolist (buf (buffer-list))
+          (with-current-buffer buf
+            (when (and buffer-file-name
+                       (not (file-remote-p buffer-file-name)))
+              (ignore-errors (vc-refresh-state)))))
+        (when (require 'diff-hl nil t)
+          (global-diff-hl-mode 1)))
+    (setq vc-handled-backends nil)
+    (when (bound-and-true-p global-diff-hl-mode)
+      (global-diff-hl-mode -1))))
+
+(defun adh--apply-subwords (on)
+  "Turn subword motion and display ON or off in all buffers."
+  (cond (on (global-subword-mode 1)
+            (adh-global-glasses-mode 1))
+        (t (when (bound-and-true-p global-subword-mode)
+             (global-subword-mode -1))
+           (when adh-global-glasses-mode
+             (adh-global-glasses-mode -1)))))
+
+(defun adh--apply-which-key (on)
+  "Turn `which-key-mode' ON or off; inside a transient menu, once it exits."
+  (remove-hook 'transient-exit-hook 'transient--resume-which-key-mode)
+  (cond ((and on (bound-and-true-p transient--prefix))
+         (add-hook 'transient-exit-hook 'transient--resume-which-key-mode))
+        (on (which-key-mode 1))
+        ((bound-and-true-p which-key-mode) (which-key-mode -1))))
+
+(defun adh-isearch-forward-with-region ()
+  "Search forward, starting from the active region if any."
+  (interactive)
+  (adh--isearch-with-region t))
+
+(defun adh-isearch-backward-with-region ()
+  "Search backward, starting from the active region if any."
+  (interactive)
+  (adh--isearch-with-region nil))
+
+(defun adh-isearch-occur ()
+  "Run `occur' on the current isearch and exit isearch."
+  (interactive)
+  (call-interactively #'isearch-occur)
+  (isearch-done))
+
 (defun adh-occur-edit-abort ()
   "Restore this Occur session's source edits and leave editing mode.
 If a source was also edited directly, keep all edits and refuse to abort."
@@ -222,18 +252,10 @@ If a source was also edited directly, keep all edits and refuse to abort."
   (occur-cease-edit)
   (set-buffer-modified-p nil))
 
-(use-package replace
-  :ensure nil :defer t
-  :hook
-  (occur-edit-mode . adh--occur-edit-start)
-  (after-save . adh--occur-source-saved))
-
 (defun adh-switch-dired-buffer ()
   "Switch to a Dired buffer."
   (interactive)
   (adh-switch-buffer-of-mode 'dired-mode "Dired: "))
-
-(defvar ls-lisp-use-insert-directory-program)
 
 (defun adh-dired-sort-toggle-or-edit (&optional arg)
   "`dired-sort-toggle-or-edit' with ARG, via external ls on Windows.
@@ -279,17 +301,30 @@ ls-lisp ignores sort switches."
     (revert-buffer)
     (message "Duplicated %d item(s)." (length files))))
 
-(defun adh--dired-rename-buffer ()
-  "Name a Dired buffer PROJECT/REL/ inside a project, else by its path."
-  (unless (bound-and-true-p dirvish-fd-buffer)
-    (let ((root (adh--get-project-dir)))
-      (rename-buffer
-       (if root
-           (let ((rel (file-relative-name default-directory root)))
-             (concat (file-name-nondirectory (directory-file-name root)) "/"
-                     (unless (equal rel "./") rel)))
-         (abbreviate-file-name default-directory))
-       t))))
+(define-globalized-minor-mode adh-global-glasses-mode glasses-mode glasses-mode
+  :predicate '(prog-mode) :group 'adhoc)
+
+(define-advice register-val-jump-to (:around (orig val arg) adh-no-file-query-prompt)
+  (if (and (consp val) (eq (car val) 'file-query))
+      (cl-letf (((symbol-function 'y-or-n-p) #'always))
+        (funcall orig val arg))
+    (funcall orig val arg)))
+
+(use-package isearch
+  :ensure nil
+  :custom
+  (isearch-lazy-count t)
+  (isearch-case-fold-search t)
+  (search-whitespace-regexp ".*?")
+  (lazy-count-prefix-format "(%s/%s) ")
+  :config
+  (advice-add 'isearch-occur :after #'adh--rename-isearch-occur-buffer))
+
+(use-package replace
+  :ensure nil :defer t
+  :hook
+  (occur-edit-mode . adh--occur-edit-start)
+  (after-save . adh--occur-source-saved))
 
 (use-package dired
   :ensure nil :defer t
@@ -347,22 +382,6 @@ ls-lisp ignores sort switches."
             (lambda ()
               (run-with-idle-timer 0 nil (lambda () (let ((inhibit-message t)) (recentf-cleanup)))))))
 
-(defun adh--apply-vc (on)
-  "Turn the built-in VC backends and `global-diff-hl-mode' ON or off."
-  (if on
-      (progn
-        (setq vc-handled-backends '(RCS CVS SVN SCCS SRC Bzr Git Hg))
-        (dolist (buf (buffer-list))
-          (with-current-buffer buf
-            (when (and buffer-file-name
-                       (not (file-remote-p buffer-file-name)))
-              (ignore-errors (vc-refresh-state)))))
-        (when (require 'diff-hl nil t)
-          (global-diff-hl-mode 1)))
-    (setq vc-handled-backends nil)
-    (when (bound-and-true-p global-diff-hl-mode)
-      (global-diff-hl-mode -1))))
-
 (add-to-list 'minor-mode-alist '(adh-use-vc " vc"))
 
 (use-package transient :defer t)
@@ -376,18 +395,6 @@ ls-lisp ignores sort switches."
   :ensure nil :defer t
   :custom
   (glasses-separate-parentheses-p nil))
-
-(define-globalized-minor-mode adh-global-glasses-mode glasses-mode glasses-mode
-  :predicate '(prog-mode) :group 'adhoc)
-
-(defun adh--apply-subwords (on)
-  "Turn subword motion and display ON or off in all buffers."
-  (cond (on (global-subword-mode 1)
-            (adh-global-glasses-mode 1))
-        (t (when (bound-and-true-p global-subword-mode)
-             (global-subword-mode -1))
-           (when adh-global-glasses-mode
-             (adh-global-glasses-mode -1)))))
 
 (use-package ediff
   :ensure nil :defer t
@@ -404,14 +411,6 @@ ls-lisp ignores sort switches."
   (diff-font-lock-prettify t)
   :hook
   (diff-mode . (lambda () (setq-local show-trailing-whitespace t))))
-
-(defun adh--apply-which-key (on)
-  "Turn `which-key-mode' ON or off; inside a transient menu, once it exits."
-  (remove-hook 'transient-exit-hook 'transient--resume-which-key-mode)
-  (cond ((and on (bound-and-true-p transient--prefix))
-         (add-hook 'transient-exit-hook 'transient--resume-which-key-mode))
-        (on (which-key-mode 1))
-        ((bound-and-true-p which-key-mode) (which-key-mode -1))))
 
 (use-package which-key
   :ensure nil :defer t

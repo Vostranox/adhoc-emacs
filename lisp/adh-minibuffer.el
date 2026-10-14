@@ -5,7 +5,19 @@
 (defvar consult--tofu-regexp)
 (defvar vertico-multiform-categories)
 (defvar vertico-mouse-map)
+
 (declare-function vertico-next "vertico")
+
+(defun adh--orderless-dollar-tofu-dispatcher (pattern _index _total)
+  "Make a trailing \"$\" in PATTERN tolerate consult's tofu suffix char."
+  (when (string-match-p "\\`[^!&].*\\$\\'" pattern)
+    `(orderless-regexp . ,(concat (substring pattern 0 -1) consult--tofu-regexp "*$"))))
+
+(defun adh--vertico-wheel-step (event)
+  "Return how many candidates the wheel EVENT moves by, or nil."
+  (pcase (event-basic-type event)
+    ('wheel-down 1)
+    ('wheel-up -1)))
 
 (defun adh-minibuffer-next-history-or-clear (n)
   "Move N steps forward through history, clearing the input past the end."
@@ -27,17 +39,6 @@
                                   nil t nil nil (symbol-name adh-vertico-style)))))
   (customize-set-variable 'adh-vertico-style style)
   (message "[adh] Vertico layout: %s" style))
-
-(defun adh--orderless-dollar-tofu-dispatcher (pattern _index _total)
-  "Make a trailing \"$\" in PATTERN tolerate consult's tofu suffix char."
-  (when (string-match-p "\\`[^!&].*\\$\\'" pattern)
-    `(orderless-regexp . ,(concat (substring pattern 0 -1) consult--tofu-regexp "*$"))))
-
-(defun adh--vertico-wheel-step (event)
-  "Return how many candidates the wheel EVENT moves by, or nil."
-  (pcase (event-basic-type event)
-    ('wheel-down 1)
-    ('wheel-up -1)))
 
 (defun adh-vertico-mouse-scroll (event)
   "Move the Vertico selection for the wheel EVENT and those queued behind it."

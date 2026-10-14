@@ -2,11 +2,12 @@
 
 (require 'adh-functions)
 
-(declare-function info--manual-names "info")
 (defvar crm-prompt)
 (defvar consult-buffer-sources)
 (defvar Info-current-file)
 (defvar consult--regexp-compiler)
+
+(declare-function info--manual-names "info")
 
 (defvar adh--imenu-items nil
   "Items that the last consult-imenu prompt offered.")

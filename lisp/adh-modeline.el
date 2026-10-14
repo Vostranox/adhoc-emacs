@@ -8,6 +8,13 @@
 (defvar flycheck-mode-line-prefix)
 (defvar flycheck-mode-line-color)
 
+(declare-function project-root "project" (project))
+
+(defface adh-mode-line-buffer-id-inactive
+  '((t (:inherit shadow)))
+  "Face for the buffer name in mode lines of unselected windows."
+  :group 'mode-line-faces)
+
 (defvar adh--ml-bg       "#181818")
 (defvar adh--ml-isle     "#1f1f1f")
 (defvar adh--ml-pill     "#282828")
@@ -20,6 +27,9 @@
 (defvar adh--ml-warn     "#f0ca54")
 (defvar adh--ml-strong   "#333132")
 
+(defvar adh--ml-lsp-epoch 0
+  "Bumped whenever eglot's set of servers may have changed.")
+
 (defconst adh--ml-palette-map
   '((adh--ml-bg       . gruber-material-dark-bg0)
     (adh--ml-isle     . gruber-material-dark-bg0-5)
@@ -31,6 +41,63 @@
     (adh--ml-bg3      . gruber-material-dark-bg3)
     (adh--ml-warn     . gruber-material-dark-yellow))
   "Which palette entry each mode line colour is.")
+
+(defconst adh--ml-cap-l "")
+(defconst adh--ml-cap-r "")
+
+(defconst adh--ml-modal-states
+  '((normal "N" . font-lock-function-name-face)
+    (insert "I" . warning)
+    (motion "M" . homoglyph)))
+
+(defconst adh--ml-minors-excluded
+  '(flycheck-mode
+    meow-normal-mode meow-insert-mode meow-motion-mode
+    completion-preview-mode)
+  "Minor modes that have a segment of their own, or none worth showing.")
+
+(defvar-local adh--ml-project-roots nil
+  "Alist of the directories looked up in this buffer and their project roots.")
+
+(defvar-local adh--ml-lsp-cache nil
+  "Cons of (EPOCH . STATE) for this buffer.")
+
+(defvar-local adh--ml-minors-expanded nil
+  "When non-nil, list the minor mode lighters instead of counting them.")
+
+(defvar-local adh--ml-flycheck-counts-cache nil
+  "Cached Flycheck counts as (ERRORS . COUNTS), keyed by list identity.")
+
+(defvar adh--ml-project-map
+  (let ((m (make-sparse-keymap)))
+    (define-key m [mode-line mouse-1] #'adh--ml-visit-project-root)
+    m)
+  "Keymap on the project name.")
+
+(defvar adh--ml-encoding-map
+  (let ((m (make-sparse-keymap)))
+    (define-key m [mode-line mouse-1] #'adh--ml-set-coding-system)
+    m)
+  "Keymap on the encoding segment.")
+
+(defvar adh--ml-tab-map
+  (let ((m (make-sparse-keymap)))
+    (define-key m [mode-line mouse-1] #'adh--ml-select-tab)
+    m)
+  "Keymap on each tab name.")
+
+(defvar adh--ml-minors-map
+  (let ((m (make-sparse-keymap)))
+    (define-key m [mode-line mouse-1] #'adh--ml-click-minor-modes)
+    m)
+  "Keymap on the minor mode toggle.")
+
+(defvar adh--ml-minor-mode-map
+  (let ((m (make-sparse-keymap)))
+    (define-key m [mode-line down-mouse-1] #'adh--ml-minor-mode-menu)
+    (define-key m [mode-line mouse-2] #'adh--ml-minor-mode-help)
+    m)
+  "Keymap on each minor mode lighter.")
 
 (defun adh--ml-mix (a b)
   "Return the colour halfway between hex colours A and B."
@@ -55,14 +122,6 @@
         (set (car pair) hex))))
   (setq adh--ml-strong (adh--ml-mix adh--ml-pill adh--ml-faint))
   (setq adh--ml-inactive (adh--ml-mix adh--ml-bg3 adh--ml-muted)))
-
-(defconst adh--ml-cap-l "")
-(defconst adh--ml-cap-r "")
-
-(defconst adh--ml-modal-states
-  '((normal "N" . font-lock-function-name-face)
-    (insert "I" . warning)
-    (motion "M" . homoglyph)))
 
 (defun adh--ml-translucent-p ()
   "Return non-nil if this frame's background is see-through."
@@ -118,16 +177,6 @@
   "Box PARTS as the chosen one of several visible siblings."
   (adh--ml-box adh--ml-strong parts))
 
-(defface adh-mode-line-buffer-id-inactive
-  '((t (:inherit shadow)))
-  "Face for the buffer name in mode lines of unselected windows."
-  :group 'mode-line-faces)
-
-(declare-function project-root "project" (project))
-
-(defvar-local adh--ml-project-roots nil
-  "Alist of the directories looked up in this buffer and their project roots.")
-
 (defun adh--ml-note-project ()
   "Resolve and cache the project root of `default-directory'."
   (setf (alist-get default-directory adh--ml-project-roots nil nil #'equal)
@@ -141,20 +190,12 @@
          (not (file-remote-p default-directory))
          (adh--ml-note-project))))
 
-(add-hook 'find-file-hook #'adh--ml-note-project)
-
 (defun adh--ml-visit-project-root (event)
   "Open the project root of the buffer whose mode line received mouse EVENT."
   (interactive "e")
   (with-selected-window (posn-window (event-start event))
     (when-let* ((root (adh--ml-project-root)))
       (find-file root))))
-
-(defvar adh--ml-project-map
-  (let ((m (make-sparse-keymap)))
-    (define-key m [mode-line mouse-1] #'adh--ml-visit-project-root)
-    m)
-  "Keymap on the project name.")
 
 (defun adh--segment-project ()
   "Return the project's directory name, clickable to jump to its root."
@@ -211,12 +252,6 @@ Prompt as in \\[set-buffer-file-coding-system]."
   (interactive "e")
   (with-selected-window (posn-window (event-start event))
     (call-interactively #'set-buffer-file-coding-system)))
-
-(defvar adh--ml-encoding-map
-  (let ((m (make-sparse-keymap)))
-    (define-key m [mode-line mouse-1] #'adh--ml-set-coding-system)
-    m)
-  "Keymap on the encoding segment.")
 
 (defun adh--segment-encoding ()
   "Return the coding system, plus the line ending when not unix."
@@ -290,12 +325,6 @@ Prompt as in \\[set-buffer-file-coding-system]."
     (with-selected-window (posn-window (event-start event))
       (tab-bar-select-tab n))))
 
-(defvar adh--ml-tab-map
-  (let ((m (make-sparse-keymap)))
-    (define-key m [mode-line mouse-1] #'adh--ml-select-tab)
-    m)
-  "Keymap on each tab name.")
-
 (defun adh--segment-tab ()
   "Return a tab list when more than one tab exists, each clickable."
   (let ((tabs (tab-bar-tabs)))
@@ -319,26 +348,14 @@ Prompt as in \\[set-buffer-file-coding-system]."
         tabs)
        " "))))
 
-(defvar adh--ml-lsp-epoch 0
-  "Bumped whenever eglot's set of servers may have changed.")
-
 (defun adh--ml-bump-lsp-epoch (&rest _)
   "Invalidate every buffer's cached LSP state."
   (setq adh--ml-lsp-epoch (1+ adh--ml-lsp-epoch)))
-
-(with-eval-after-load 'eglot
-  (add-hook 'eglot-connect-hook #'adh--ml-bump-lsp-epoch)
-  (add-hook 'eglot-managed-mode-hook #'adh--ml-bump-lsp-epoch))
 
 (defun adh--ml-lsp-toggled (&rest _)
   "Redraw every mode line's LSP state after global eglot is switched."
   (adh--ml-bump-lsp-epoch)
   (force-mode-line-update t))
-
-(add-variable-watcher 'adh--eglot-global-enabled #'adh--ml-lsp-toggled)
-
-(defvar-local adh--ml-lsp-cache nil
-  "Cons of (EPOCH . STATE) for this buffer.")
 
 (defun adh--ml-lsp-server-covers-p ()
   "Return non-nil if a running eglot server's project contains this file."
@@ -395,12 +412,6 @@ Prompt as in \\[set-buffer-file-coding-system]."
                  (concat " " (adh--ml-tint extra adh--ml-fg t))))))
     ('unmanaged (adh--ml-lsp-button adh--ml-inactive))))
 
-(defconst adh--ml-minors-excluded
-  '(flycheck-mode
-    meow-normal-mode meow-insert-mode meow-motion-mode
-    completion-preview-mode)
-  "Minor modes that have a segment of their own, or none worth showing.")
-
 (defun adh--ml-active-minor-modes ()
   "Return (MODE . LIGHTER) for the enabled minor modes that show a lighter."
   (let (out)
@@ -411,9 +422,6 @@ Prompt as in \\[set-buffer-file-coding-system]."
           (let ((s (string-trim (adh--ml-literal (car-safe (cdr entry))))))
             (unless (string-empty-p s)
               (push (cons sym s) out))))))))
-
-(defvar-local adh--ml-minors-expanded nil
-  "When non-nil, list the minor mode lighters instead of counting them.")
 
 (defun adh-toggle-minor-modes ()
   "Expand or contract this buffer's minor mode list in the mode line."
@@ -426,12 +434,6 @@ Prompt as in \\[set-buffer-file-coding-system]."
   (interactive "e")
   (with-selected-window (posn-window (event-start event))
     (adh-toggle-minor-modes)))
-
-(defvar adh--ml-minors-map
-  (let ((m (make-sparse-keymap)))
-    (define-key m [mode-line mouse-1] #'adh--ml-click-minor-modes)
-    m)
-  "Keymap on the minor mode toggle.")
 
 (defun adh--ml-minor-mode-at (event)
   "Return the minor mode whose lighter EVENT is on, or nil."
@@ -449,13 +451,6 @@ Prompt as in \\[set-buffer-file-coding-system]."
   (interactive "@e")
   (when-let* ((mode (adh--ml-minor-mode-at event)))
     (describe-minor-mode-from-symbol (or (get mode :minor-mode-function) mode))))
-
-(defvar adh--ml-minor-mode-map
-  (let ((m (make-sparse-keymap)))
-    (define-key m [mode-line down-mouse-1] #'adh--ml-minor-mode-menu)
-    (define-key m [mode-line mouse-2] #'adh--ml-minor-mode-help)
-    m)
-  "Keymap on each minor mode lighter.")
 
 (defun adh--segment-minor-modes ()
   "Return the minor mode count, or the lighters when expanded.
@@ -482,14 +477,9 @@ The count toggles the list; a lighter opens its mode's menu."
                                  'local-map adh--ml-minor-mode-map))
                    modes " ")))))))
 
-(defvar-local adh--ml-flycheck-counts-cache nil
-  "Cached Flycheck counts as (ERRORS . COUNTS), keyed by list identity.")
-
 (defun adh--ml-clear-flycheck-counts (&optional _status)
   "Invalidate diagnostic counts after Flycheck reports a status change."
   (setq adh--ml-flycheck-counts-cache nil))
-
-(add-hook 'flycheck-status-changed-functions #'adh--ml-clear-flycheck-counts)
 
 (defun adh--ml-flycheck-counts ()
   "Count the current Flycheck diagnostics once per result list."
@@ -593,11 +583,6 @@ The count toggles the list; a lighter opens its mode's menu."
   "Force every mode line to redraw, for `adh--ml-render'."
   (force-mode-line-update t))
 
-(add-hook 'minibuffer-setup-hook #'adh--ml-minibuffer-refresh)
-(add-hook 'minibuffer-exit-hook  #'adh--ml-minibuffer-refresh)
-
-(setq-default mode-line-format '("%e" (:eval (adh--ml-render))))
-
 (defun adh--ml-flatten-faces ()
   "Make the mode line background match the frame and drop its border."
   (dolist (face '(mode-line mode-line-active mode-line-inactive))
@@ -612,6 +597,21 @@ The count toggles the list; a lighter opens its mode's menu."
   "Re-read the palette, then re-flatten the mode line faces."
   (adh--ml-sync-palette)
   (adh--ml-flatten-faces))
+
+(add-hook 'find-file-hook #'adh--ml-note-project)
+
+(with-eval-after-load 'eglot
+  (add-hook 'eglot-connect-hook #'adh--ml-bump-lsp-epoch)
+  (add-hook 'eglot-managed-mode-hook #'adh--ml-bump-lsp-epoch))
+
+(add-variable-watcher 'adh--eglot-global-enabled #'adh--ml-lsp-toggled)
+
+(add-hook 'flycheck-status-changed-functions #'adh--ml-clear-flycheck-counts)
+
+(add-hook 'minibuffer-setup-hook #'adh--ml-minibuffer-refresh)
+(add-hook 'minibuffer-exit-hook  #'adh--ml-minibuffer-refresh)
+
+(setq-default mode-line-format '("%e" (:eval (adh--ml-render))))
 
 (adh--ml-refresh-theme)
 (add-hook 'enable-theme-functions #'adh--ml-refresh-theme)

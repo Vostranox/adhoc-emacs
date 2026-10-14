@@ -1,7 +1,7 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
 (require 'adh-package-config)
-(require 'use-package)
+(eval-when-compile (require 'use-package))
 
 (defun adh-upgrade-packages (&optional query)
   "Upgrade all packages, including those installed with package-vc.

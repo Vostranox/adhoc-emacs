@@ -2,10 +2,10 @@
 
 (require 'adh-functions)
 
+(declare-function project-try-vc "project" (dir))
+
 (defvar adh--shell-prompt-dir nil
   "When set, adh labels compile and shell prompts with this directory.")
-
-(declare-function project-try-vc "project" (dir))
 
 (defun adh--project-try (&optional dir)
   "Project.el backend: DIR's project, Git-backed if its root has a .git entry."

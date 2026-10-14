@@ -1,5 +1,16 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
+(defun adh--meow-minibuffer-update-cursor ()
+  "Match the minibuffer cursor shape to the current meow state."
+  (setq cursor-type (if (or (meow-normal-mode-p) (meow-motion-mode-p)) 'box 'bar)))
+
+(defun adh--meow-minibuffer-setup ()
+  "Enable modal editing in the minibuffer, starting in insert state."
+  (meow-insert-mode 1)
+  (setq-local cursor-type 'bar)
+  (add-hook 'post-command-hook #'adh--meow-minibuffer-update-cursor nil t)
+  (redisplay))
+
 (defun adh-toggle-meow-motion-mode ()
   "Switch between meow normal and motion states."
   (interactive)
@@ -20,17 +31,6 @@
       (kill-region (region-beginning) (region-end) 'region)
     (unless (eobp) (delete-char 1)))
   (meow-insert))
-
-(defun adh--meow-minibuffer-update-cursor ()
-  "Match the minibuffer cursor shape to the current meow state."
-  (setq cursor-type (if (or (meow-normal-mode-p) (meow-motion-mode-p)) 'box 'bar)))
-
-(defun adh--meow-minibuffer-setup ()
-  "Enable modal editing in the minibuffer, starting in insert state."
-  (meow-insert-mode 1)
-  (setq-local cursor-type 'bar)
-  (add-hook 'post-command-hook #'adh--meow-minibuffer-update-cursor nil t)
-  (redisplay))
 
 (use-package meow
   :ensure t

@@ -1,7 +1,6 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
 (require 'adh-functions)
-
 (eval-when-compile
   (when (bound-and-true-p byte-compile-current-file)
     (require 'magit)))
@@ -13,14 +12,10 @@
   "Minibuffer history of `adh-magit-submodule-foreach'.")
 (defvar adh--git-show-cache nil
   "Recent commit previews, most recent first, as ((DIR HASH FILES) . TEXT).")
-(defconst adh--git-commit-format "%h%x00%ad%x00%an%x00%D%x00%s"
-  "Git log format of the fields `adh--git-commit-candidate' takes.")
 (defvar adh--magit-show-full-commit nil
   "Non-nil while `adh-magit-show-commit-original' runs.")
-
-(define-derived-mode magit-staging-mode magit-status-mode "magit-staging"
-  "Like `magit-status-mode' but limited to staged/unstaged changes."
-  :group 'magit-status)
+(defconst adh--git-commit-format "%h%x00%ad%x00%an%x00%D%x00%s"
+  "Git log format of the fields `adh--git-commit-candidate' takes.")
 
 (defun magit-staging-refresh-buffer ()
   "Populate a `magit-staging-mode' buffer with just the change sections."
@@ -525,6 +520,10 @@ In the picker, the preview shows each stash's changes."
     (magit-stash-show
      (get-text-property 0 'adh-git-stash
                         (adh--git-read "Stashes: " 'adh-git-stash (adh--git-stash-candidates))))))
+
+(define-derived-mode magit-staging-mode magit-status-mode "magit-staging"
+  "Like `magit-status-mode' but limited to staged/unstaged changes."
+  :group 'magit-status)
 
 (with-eval-after-load 'adh-picker
   (adh-picker-define-preview 'adh-git-commit #'adh--git-show-preview)
