@@ -45,7 +45,7 @@
     consult-fd consult-find consult-locate consult-recent-file project-find-file
     adh-consult-fd-here adh-consult-fd-project adh-consult-fd-dirs adh-consult-locate
     consult-bookmark
-    adh-consult-zoxide adh-switch-dired-dwim dirvish-history-jump
+    consult-zoxide adh-switch-dired-dwim dirvish-history-jump
     consult-ripgrep consult-grep consult-git-grep
     adh-consult-ripgrep-here adh-consult-ripgrep-project adh-consult-ripgrep-dirs
     consult-line consult-line-multi consult-outline consult-mark consult-global-mark
@@ -685,7 +685,8 @@ Stop the external decoder at the preview limit or after one second."
     ('buffer
      (when-let* ((buf (if (bufferp item) item (get-buffer item))))
        (when (buffer-live-p buf) (list 'buffer buf nil))))
-    ((or 'file 'project-file) (adh--picker-file-target item))
+    ((or 'file 'project-file 'consult-zoxide-dir)
+     (adh--picker-file-target item))
     ('bookmark (adh--picker-bookmark-target item))
     ('consult-grep (adh--picker-grep-target cand))
     ((or 'command 'function 'variable 'symbol 'symbol-help) (adh--picker-symbol-target item))

@@ -9,11 +9,6 @@
 (defvar popper-open-popup-alist)
 (defvar popper-popup-status)
 
-(defun adh--zoxide-add ()
-  "Add `default-directory' to zoxide if it is installed."
-  (when (executable-find "zoxide")
-    (zoxide-add)))
-
 (defun adh--apply-use-dirvish (on)
   "Open new Dired buffers in Dirvish when ON, else in plain Dired."
   (when (and on (not (fboundp 'dirvish-override-dired-mode)))
@@ -134,11 +129,6 @@ ALIST supplies action options as in `display-buffer'."
              `(display-buffer-at-bottom (window-height . ,(window-total-height)))
            display-buffer-overriding-action)))
     (popper-toggle-type)))
-
-(use-package zoxide
-  :ensure t
-  :hook
-  ((find-file dired-mode) . adh--zoxide-add))
 
 (use-package dirvish
   :vc (:url "https://github.com/Vostranox/dirvish" :rev :newest)

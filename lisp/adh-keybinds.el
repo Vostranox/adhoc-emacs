@@ -35,7 +35,7 @@
   "M-r" #'adh-consult-ripgrep-project
   "M-t" #'adh-project-async-shell-command-region
   "M-s" #'adh-consult-fd-project
-  "M-o" #'adh-consult-zoxide)
+  "M-o" #'consult-zoxide)
 
 ;;; global map
 
@@ -132,7 +132,7 @@
   "M-d" #'adh-consult-dirs-pivot
   "M-r" (cons "adh-consult-ripgrep-project" (=> (adh--minibuffer-pivot #'adh-consult-ripgrep-project)))
   "M-s" (cons "adh-consult-fd-project" (=> (adh--minibuffer-pivot #'adh-consult-fd-project)))
-  "M-o" (cons "adh-consult-zoxide" (=> (adh--minibuffer-pivot #'adh-consult-zoxide)))
+  "M-o" (cons "consult-zoxide" (=> (adh--minibuffer-pivot #'consult-zoxide)))
   "M-a" #'embark-export
   "M-." #'adh-consult-root-pivot
   "M-<" #'end-of-buffer
@@ -169,7 +169,6 @@
   :prefix "s"
   "f" #'adh-consult-fd-here
   "h" #'adh-consult-fd-project
-  "z" #'adh-consult-zoxide
   "," #'adh-get-executable
   "." #'adh-consult-locate
   "/" #'adh-getenv)
@@ -202,7 +201,7 @@
 (adh-defkeymap adh-magit-keymap
   :map adh-leader-map
   :prefix "m"
-  "o" #'adh-switch-magit-buffer
+  "o" #'consult-magit
   "f" #'magit-file-dispatch
   "h" #'magit-dispatch
   "a" #'adh-magit-status-dwim

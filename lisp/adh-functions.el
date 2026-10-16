@@ -337,7 +337,6 @@ From a protected side panel, keep the last used main window."
              (main (or (adh--main-window (not keep-side))
                        (user-error "No suitable main window available"))))
         (unless keep-side
-          ;; Let quitting restore even buffers hidden by our switching filter.
           (display-buffer-record-window 'reuse main (window-buffer win))
           (set-window-buffer main (window-buffer win)))
         (delete-other-windows main)

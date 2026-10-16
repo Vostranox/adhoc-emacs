@@ -13,19 +13,7 @@
   "Items that the last consult-imenu prompt offered.")
 (defvar adh-consult-info-manuals '("emacs" "elisp" "efaq" "cl")
   "Manuals that `adh-consult-info' searches by default.")
-(defvar adh--consult-source-zoxide
-  `( :name     "Zoxide"
-     :narrow   ?z
-     :category file
-     :face     consult-file
-     :history  file-name-history
-     :action   ,#'consult--file-action
-     :enabled  ,(lambda () (executable-find "zoxide"))
-     :items    ,(lambda ()
-                  (mapcar (lambda (dir)
-                            (file-name-as-directory (consult--fast-abbreviate-file-name dir)))
-                          (zoxide-query))))
-  "Zoxide directory source for `consult-buffer'.")
+
 (defvar adh--grep-lookahead-cache (make-hash-table :test #'equal)
   "Results of `consult--grep-lookahead-p', per host and command.")
 
@@ -311,15 +299,6 @@ everything `consult-buffer' does, such as recent files and bookmarks."
                (Info-current-file (list (file-name-base Info-current-file)))
                (t adh-consult-info-manuals))))
 
-(defun adh-consult-zoxide ()
-  "Visit a directory from zoxide's database, picked with consult."
-  (interactive)
-  (require 'consult)
-  (consult--multi '(adh--consult-source-zoxide)
-                  :prompt "Open dir: "
-                  :require-match t
-                  :sort nil))
-
 (defun adh-embark-export-imenu (names)
   "Export the definition lines of imenu NAMES to an occur buffer."
   (let ((items (cond ((memq (bound-and-true-p embark--command) '(consult-imenu consult-imenu-multi))
@@ -363,7 +342,6 @@ everything `consult-buffer' does, such as recent files and bookmarks."
                          :sort 'visibility
                          :predicate #'adh--buffer-listable-p
                          :as #'consult--buffer-pair)))
-  (add-to-list 'consult-buffer-sources 'adh--consult-source-zoxide 'append)
 
   (defvar adh--consult-ripgrep-args-base consult-ripgrep-args)
 
@@ -390,6 +368,13 @@ everything `consult-buffer' does, such as recent files and bookmarks."
   (consult-customize consult-imenu-multi consult-goto-line :preview-key 'any)
   (consult-customize consult-buffer adh-consult-buffer consult-bookmark :require-match t)
   (consult-customize consult-recent-file :prompt "Open file: "))
+
+(use-package consult-magit
+  :ensure t :after (consult magit))
+
+(use-package consult-zoxide
+  :ensure t :after consult
+  :hook ((find-file dired-mode) . consult-zoxide-track))
 
 (use-package embark
   :ensure t :defer t

@@ -151,7 +151,6 @@ Each candidate carries its patch of those lines in `adh-git-patch'."
                   (adh--git-commit-candidate
                    (split-string (substring entry 0 eol) "\0")
                    'adh-git-patch patch
-                   ;; The file's name at that commit, which differs before a rename.
                    'adh-git-files (list (or (adh--git-patch-file patch) file))))))
             (split-string log "\1" t))))
 
@@ -342,11 +341,6 @@ Each candidate carries its path in `adh-git-file' and its status in
       (when-let* ((buf (get-file-buffer path)))
         (with-current-buffer buf
           (revert-buffer :ignore-auto :noconfirm))))))
-
-(defun adh-switch-magit-buffer ()
-  "Switch to a Magit buffer."
-  (interactive)
-  (adh-switch-buffer-of-mode 'magit-status-mode "Magit: "))
 
 (defun adh-magit-status-dwim ()
   "Show this repo's status without refreshing, else prompt for a repo."
