@@ -452,6 +452,12 @@ With MARKED, copy the paths of marked Dired files, if any."
   "Open files with extension EXT in MODE."
   (add-to-list 'auto-mode-alist (cons (format "\\.%s\\'" (regexp-quote ext)) mode)))
 
+(defun adh-remap-major-modes (target modes)
+  "Use TARGET instead of MODES when selecting a major mode for a file.
+MODES is a mode symbol or a list of mode symbols."
+  (dolist (mode (if (listp modes) modes (list modes)))
+    (setf (alist-get mode major-mode-remap-alist) target)))
+
 (defun adh-add-to-path (path)
   "Prepend PATH to the variable `exec-path' and the PATH environment variable."
   (let ((expanded-path (expand-file-name path)))

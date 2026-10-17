@@ -25,6 +25,7 @@
         adh-mono-spaced-font-size 110)
 
 (setq shell-file-name "/usr/bin/fish")
+(adh-set-file-extension-mode "fish" 'fish-mode)
 
 (setopt adh-picker-commands (remq 'consult-bookmark adh-picker-commands))
 
@@ -45,8 +46,11 @@
   (add-hook hook (lambda () (use-local-map nil))))
 
 (define-derived-mode adh-glsl-mode slang-ts-mode "Glsl")
-(adh-set-file-extension-mode "glsl" 'adh-glsl-mode)
+(adh-remap-major-modes 'adh-glsl-mode '(glsl-mode glsl-ts-mode))
 (adh-register-lsp-server 'adh-glsl-mode "glsl_analyzer")
 
 (adh-register-lsp-server '(c-ts-mode c++-ts-mode) "/opt/llvm/bin/clangd" "--header-insertion=never")
 (adh-set-flycheck-executable 'c/c++-clang "/opt/llvm/bin/clang")
+
+(adh-register-lsp-server '(rust-mode rust-ts-mode) "rust-analyzer")
+(adh-set-flycheck-executable 'rust-cargo "cargo")
