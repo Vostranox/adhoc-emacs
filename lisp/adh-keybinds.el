@@ -126,6 +126,7 @@
 
 (define-keymap :keymap minibuffer-local-map
   "C-l" #'kill-ring-save
+  "C-d" #'other-window
   "C-r" #'consult-history
   "C-o" (cons "consult-recent-file" (=> (adh--minibuffer-pivot #'consult-recent-file)))
   "C-h" #'mark-word

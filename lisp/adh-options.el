@@ -197,7 +197,7 @@ A session name, or SESSION:WINDOW or SESSION:WINDOW.PANE."
   :group 'adhoc
   :type '(choice (const :tag "Current session" nil) string))
 
-(defcustom adh-treesit-excluded-modes '(cmake-ts-mode)
+(defcustom adh-treesit-excluded-modes nil
   "Tree-sitter modes left out of `treesit-enabled-modes'."
   :group 'adhoc
   :type '(repeat symbol))
