@@ -833,7 +833,9 @@ MATCHES are strings to highlight on the line TARGET points at."
             (setq adh--picker-shown shown)
             (when (timerp adh--picker-timer)
               (cancel-timer adh--picker-timer))
-            (if (or first (adh--picker-quick-p target))
+            (when first
+              (adh--picker-render nil))
+            (if (adh--picker-quick-p target)
                 (adh--picker-render target matches)
               (setq adh--picker-timer
                     (run-with-timer adh-picker-preview-delay nil

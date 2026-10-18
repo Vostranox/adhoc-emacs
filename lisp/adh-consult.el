@@ -6,6 +6,8 @@
 (defvar consult-buffer-sources)
 (defvar Info-current-file)
 (defvar consult--regexp-compiler)
+(defvar consult-async-split-style)
+(defvar consult-async-split-styles-alist)
 
 (declare-function info--manual-names "info")
 
@@ -233,6 +235,25 @@ START prefills the directory prompt."
   (interactive)
   (adh--consult-with-region #'consult-ripgrep (adh--get-project-dir)))
 
+(defun adh-consult-project-file-pivot ()
+  "Switch to project files, carrying over search terms and filters."
+  (interactive)
+  (let ((input (minibuffer-contents-no-properties)))
+    (when (memq 'consult--split completion-styles)
+      (let* ((style (alist-get (or consult-async-split-style 'none)
+                              consult-async-split-styles-alist))
+             (split (funcall (plist-get style :function) input style))
+             (query (condition-case nil
+                        (car (consult--command-split (car split)))
+                      (error (car split)))))
+        (when (string-match-p (rx bos (or "Fd" "Rg")) (minibuffer-prompt))
+          (setq query (adh--pcre-to-emacs-regexp query)))
+        (setq input
+              (string-join
+               (seq-remove #'string-empty-p (list query (substring input (cadr split))))
+               " "))))
+    (adh--minibuffer-pivot #'project-find-file input)))
+
 (defun adh-consult-dirs-pivot ()
   "Rerun the current fd or ripgrep search in other directories."
   (interactive)
@@ -345,8 +366,8 @@ everything `consult-buffer' does, such as recent files and bookmarks."
 
   (defvar adh--consult-ripgrep-args-base consult-ripgrep-args)
 
-  (setq consult-fd-args '(adh--fd-program "--sort-by-depth --hidden --no-ignore --prune --color=never --exclude .git --path-separator=/"))
-  (setq consult-ripgrep-args (concat adh--consult-ripgrep-args-base " --hidden --no-ignore -g !TAGS -g !*.{git,zip,tar,gz,tgz,bz2,tbz2,xz,txz,zst,tzst,7z,rar,lz4,lzma,Z,jar,war}"))
+  (setq consult-fd-args '(adh--fd-program "--sort-by-depth --hidden --prune --color=never --exclude .git --path-separator=/"))
+  (setq consult-ripgrep-args (concat adh--consult-ripgrep-args-base " --hidden -g !TAGS -g !*.{git,zip,tar,gz,tgz,bz2,tbz2,xz,txz,zst,tzst,7z,rar,lz4,lzma,Z,jar,war}"))
 
   (advice-add 'consult--fd-make-builder :around #'adh--consult-fd-scoped)
   (advice-add 'consult--ripgrep-make-builder :around #'adh--consult-ripgrep-scoped)

@@ -33,7 +33,7 @@
   "C-o" #'consult-recent-file
   "M-n" #'adh-project-compile-region
   "M-r" #'adh-consult-ripgrep-project
-  "M-t" #'adh-project-async-shell-command-region
+  "M-t" #'project-find-file
   "M-s" #'adh-consult-fd-project
   "M-o" #'consult-zoxide)
 
@@ -133,6 +133,7 @@
   "M-d" #'adh-consult-dirs-pivot
   "M-r" (cons "adh-consult-ripgrep-project" (=> (adh--minibuffer-pivot #'adh-consult-ripgrep-project)))
   "M-s" (cons "adh-consult-fd-project" (=> (adh--minibuffer-pivot #'adh-consult-fd-project)))
+  "M-t" #'adh-consult-project-file-pivot
   "M-o" (cons "consult-zoxide" (=> (adh--minibuffer-pivot #'consult-zoxide)))
   "M-a" #'embark-export
   "M-." #'adh-consult-root-pivot
@@ -161,6 +162,7 @@
   "d" #'adh-switch-dired-dwim
   "c" #'adh-consult-buffer
   "b" #'consult-bookmark
+  "g" #'adh-git-status
   "x" #'adh-toggle-meow-motion-mode
   "w" #'adh-dired-or-file
   "DEL" #'find-file)
@@ -170,6 +172,7 @@
   :prefix "s"
   "f" #'adh-consult-fd-here
   "h" #'adh-consult-fd-project
+  "a" #'project-find-file
   "," #'adh-get-executable
   "." #'adh-consult-locate
   "/" #'adh-getenv)
@@ -210,8 +213,6 @@
   "l" #'adh-git-log
   "L" #'adh-git-log-file
   "t" #'adh-git-log-line
-  "s" #'adh-git-status
-  "d" #'adh-git-hunks
   "b" #'adh-git-branches
   "z" #'adh-git-stash
   "." #'adh-magit-status-dwim

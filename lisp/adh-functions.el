@@ -52,9 +52,9 @@ In a prompt that a pivot opened, hand FN back to that pivot instead."
                       nil))))))
     (abort-recursive-edit)))
 
-(defun adh--minibuffer-pivot (command)
-  "Abort the minibuffer and reopen it under COMMAND with the same input."
-  (let ((input (minibuffer-contents)))
+(defun adh--minibuffer-pivot (command &optional input)
+  "Reopen the minibuffer under COMMAND with INPUT, or its current contents."
+  (let ((input (or input (minibuffer-contents))))
     (adh--minibuffer-pivot-call
      (lambda ()
        (let ((this-command command))

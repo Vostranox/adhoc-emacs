@@ -471,16 +471,6 @@ In the picker, the preview shows each file's changes since the last commit."
         (find-file (expand-file-name file))
       (magit-diff-range "HEAD" nil (list file)))))
 
-(defun adh-git-hunks ()
-  "Pick a hunk of the changes since the last commit and go to it.
-In the picker, the preview shows each hunk."
-  (interactive)
-  (let* ((default-directory (adh--git-toplevel))
-         (hunk (adh--git-read "Hunks: " 'adh-git-hunk (adh--git-hunk-candidates))))
-    (find-file (expand-file-name (get-text-property 0 'adh-git-file hunk)))
-    (goto-char (point-min))
-    (forward-line (1- (get-text-property 0 'adh-git-line hunk)))))
-
 (defun adh-git-branches ()
   "Pick a branch and check it out; a remote one gets a local tracking branch.
 Reuse a local branch only when it tracks the selected remote branch.

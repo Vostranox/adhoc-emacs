@@ -9,7 +9,7 @@
 (defvar magit-blame-read-only-mode-map)
 (defvar git-commit-mode-map)
 (defvar ibuffer-mode-map)
-(defvar ediff-mode-map
+(defvar ediff-mode-map)
 (defvar electric-pair-mode-map)
 
 (declare-function dirvish-subtree--expanded-p "dirvish-subtree")
