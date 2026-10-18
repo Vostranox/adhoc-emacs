@@ -1,6 +1,7 @@
 ;;; -*- lexical-binding: t; coding: utf-8 -*-
 
 (require 'adh-functions)
+(require 'adh-match)
 
 (defvar meow-normal-state-keymap)
 (defvar vertico-multiform-map)
@@ -317,7 +318,7 @@
     '("z" . kill-word)
     '("x" . kill-whole-line)
     '("X" . adh-kill-line-above)
-    '("m" . kill-sexp)
+    (cons "m" adh-match-map)
     '("M" . kill-rectangle)
     '("w" . adh-kill-region-or-line)
     '("v" . rectangle-mark-mode)
