@@ -215,14 +215,79 @@ TARGET nil means the current pane.  NAME names the Emacs process."
       (set-mark beg)))
   (duplicate-dwim n))
 
+(defun adh--inside-prose-quotes (pos)
+  "Return the inside bounds of paired quotes around POS on its line.
+Recognize double quotes, single quotes and backticks.  Ignore escaped
+quotes and apostrophes in contractions or possessives.  This supplements
+prose syntax tables, where quotes are often punctuation rather than
+string syntax."
+  (save-excursion
+    (goto-char pos)
+    (let ((limit (line-end-position))
+          (begin (line-beginning-position))
+          quote start bounds)
+      (goto-char begin)
+      (while (and (not bounds) (re-search-forward "[\"'`]" limit t))
+        (let* ((at (1- (point)))
+               (char (char-after at))
+               (escaped (save-excursion
+                          (goto-char at)
+                          (= 1 (% (- at (progn (skip-chars-backward "\\\\" begin)
+                                                (point)))
+                                  2))))
+               (apostrophe
+                (and (eq char ?')
+                     (> at begin)
+                     (memq (char-syntax (char-before at)) '(?w ?_))
+                     (or (null quote)
+                         (and (< (1+ at) limit)
+                              (memq (char-syntax (char-after (1+ at)))
+                                    '(?w ?_)))))))
+          (unless (or escaped apostrophe)
+            (cond
+             ((null quote) (setq quote char start at))
+             ((eq char quote)
+              (when (<= start pos at)
+                (setq bounds (cons (1+ start) at)))
+              (setq quote nil start nil))))))
+      bounds)))
+
+(defun adh--inside-pair-bounds ()
+  "Return inside bounds of the enclosing bracket pair or string.
+Use the major mode's syntax, including string escapes and comments.
+At an opening delimiter, use that pair; at a closing delimiter, use
+its matching opener.  Return nil if there is no complete pair."
+  (save-excursion
+    (let* ((pos (point))
+           (state (syntax-ppss pos))
+           (syntax (syntax-after pos))
+           (start (cond
+                   ((nth 3 state) (nth 8 state))
+                   ((and (not (nth 4 state)) (not (nth 5 state))
+                         syntax (memq (syntax-class syntax) '(4 7 15)))
+                    pos)
+                   (t (nth 1 state)))))
+      (or (and (not (derived-mode-p 'prog-mode))
+               (adh--inside-prose-quotes pos))
+          (when start
+            (let ((end (condition-case nil (scan-sexps start 1)
+                         (scan-error nil))))
+              (when (and end (< pos end) (> end (1+ start))
+                         (or (not (= (syntax-class (syntax-after start)) 4))
+                             (eq (char-before end)
+                                 (cdr (syntax-after start)))))
+                (cons (1+ start) (1- end)))))))))
+
 (defun adh-mark-inside ()
-  "Mark the contents of the sexp at point, excluding its delimiters."
+  "Select inside the enclosing brackets or quotes, even from the middle.
+Leave point at the beginning and mark at the end.  If no complete
+pair encloses point, leave point and the current selection unchanged."
   (interactive)
-  (mark-sexp)
-  (forward-char)
-  (exchange-point-and-mark)
-  (backward-char)
-  (exchange-point-and-mark))
+  (let ((bounds (adh--inside-pair-bounds)))
+    (unless bounds (user-error "No enclosing bracket pair or quotes"))
+    (push-mark (cdr bounds) t t)
+    (goto-char (car bounds))
+    (setq deactivate-mark nil)))
 
 (defun adh--indent-line ()
   "Indent the current line for the mode, falling back like TAB where it declines."

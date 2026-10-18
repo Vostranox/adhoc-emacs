@@ -82,6 +82,11 @@ Return nil on a terminal or if the font is missing."
       (let ((inhibit-read-only t))
         (put-text-property (point-min) (1+ (point-min)) 'first-completion t)))))
 
+(define-advice forward-sexp (:around (orig &rest args) adh-syntax-only)
+  "Use balanced syntax-table expressions for sexp motion and marking."
+  (let ((forward-sexp-function nil))
+    (apply orig args)))
+
 (defun adh-forward-sexp (&optional arg)
   "Move forward ARG sexps using the syntax table for layout navigation."
   (interactive "^p")
