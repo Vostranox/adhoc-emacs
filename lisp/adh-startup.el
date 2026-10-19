@@ -20,7 +20,7 @@ When nil, use `adh-compile-config' to check and compile on demand."
 
 (defconst adh-layout-modules
   '(adh-core-packages adh-project adh-flycheck adh-ext-packages
-    adh-completion adh-minibuffer adh-settings adh-consult adh-magit)
+    adh-completion adh-minibuffer adh-settings adh-consult adh-magit adh-jump)
   "Modules whose commands the custom keybindings bind.")
 
 (defun adh--record-package-error (type _message &optional level _buffer-name)

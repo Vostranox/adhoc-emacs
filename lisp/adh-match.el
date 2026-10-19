@@ -367,9 +367,6 @@ before the host language.  No parser or grammar is created or downloaded."
   "Return bounds for OBJECT, AROUND or inside, with prefix COUNT."
   (unless (> count 0) (user-error "The match count must be positive"))
   (let ((pos (adh--match-position)))
-    ;; Keep an unchanged syntax selection anchored inside its node when
-    ;; switching around/inside or repeating.  Its visible beginning may
-    ;; be a decorator, attribute or opening tag outside that node.
     (when (and (memq object '(?f ?t ?T ?x)) (use-region-p)
                (eq object (car adh--match-last-selection))
                (equal (nthcdr 2 adh--match-last-selection)

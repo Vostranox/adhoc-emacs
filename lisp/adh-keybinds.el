@@ -334,7 +334,8 @@
     '(";" . mark-sexp)
     '(")" . adh-scroll-up-half)
     '("(" . adh-scroll-down-half)
-    '("{" . pop-to-mark-command)
+    '("{" . adh-jump-backward)
+    '("}" . adh-jump-forward)
     '("=" . backward-up-list)
     '(">" . adh-backward-sexp)
     '("<" . adh-forward-sexp)
@@ -349,6 +350,8 @@
     '("<escape>" . adh-mc-keyboard-quit-dwim)
     '("a" . next-line)
     '("e" . previous-line)
+    '("{" . adh-jump-backward)
+    '("}" . adh-jump-forward)
     '("(" . adh-scroll-down-half)
     '(")" . adh-scroll-up-half)))
 

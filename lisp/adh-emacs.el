@@ -231,7 +231,8 @@ Return nil on a terminal or if the font is missing."
                  (window-parameters . ((no-other-window . t)))))
 
   (setq switch-to-prev-buffer-skip
-        (lambda (_window buf _bury-or-kill) (not (adh--buffer-listable-p buf))))
+        (lambda (_window buf bury-or-kill)
+          (and bury-or-kill (not (adh--buffer-listable-p buf)))))
 
   (delete-selection-mode 1)
   (adh--apply-electric-pair adh-use-electric-pair)
