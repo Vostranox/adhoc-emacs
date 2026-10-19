@@ -166,6 +166,8 @@
   "g" #'adh-git-status
   "x" #'adh-toggle-meow-motion-mode
   "w" #'adh-dired-or-file
+  "u" #'consult-register
+  "U" #'consult-register-store
   "DEL" #'find-file)
 
 (adh-defkeymap adh-find-keymap

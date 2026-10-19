@@ -44,7 +44,7 @@
   '(consult-buffer consult-project-buffer adh-consult-buffer
     consult-fd consult-find consult-locate consult-recent-file project-find-file
     adh-consult-fd-here adh-consult-fd-project adh-consult-fd-dirs adh-consult-locate
-    consult-bookmark
+    consult-bookmark consult-register
     consult-zoxide adh-switch-dired-dwim dirvish-history-jump
     consult-ripgrep consult-grep consult-git-grep
     adh-consult-ripgrep-here adh-consult-ripgrep-project adh-consult-ripgrep-dirs
@@ -54,8 +54,7 @@
     consult-flycheck consult-flymake consult-compile-error
     project-switch-project describe-symbol describe-function describe-variable
     adh-consult-info
-    adh-git-log adh-git-log-file adh-git-log-line adh-git-status adh-git-hunks
-    adh-git-branches adh-git-stash)
+    adh-git-log adh-git-log-file adh-git-log-line adh-git-status adh-git-branches adh-git-stash)
   "Commands whose prompts open in the floating picker."
   :group 'adh-picker
   :type '(repeat (function :tag "Command"))
@@ -568,15 +567,21 @@ Stop the external decoder at the preview limit or after one second."
     (`(buffer ,buf ,pos)
      (list (adh--picker-buffer-view buf pos)
            (or pos (with-current-buffer buf (point))) (buffer-name buf)))
-    (`(file ,file ,line . ,search)
+    (`(file ,file ,location . ,search)
      (let ((title (abbreviate-file-name file)))
        (cond
         ((file-remote-p file) (list (adh--picker-text "Remote file") nil title))
         ((file-directory-p file) (list (adh--picker-dir-buffer file) nil title))
         ((not (file-readable-p file)) (list (adh--picker-text "") nil title))
         (t (let* ((buf (or (adh--picker-visiting file) (adh--picker-file-buffer file)))
-                  (pos (cond (line (adh--picker-line-pos buf line))
-                             (search (adh--picker-search-pos buf (car search))))))
+                  (pos (pcase location
+                         (`(position . ,offset)
+                          (with-current-buffer buf
+                            (save-restriction
+                              (widen)
+                              (max (point-min) (min offset (point-max))))))
+                         ((pred integerp) (adh--picker-line-pos buf location))
+                         (_ (and search (adh--picker-search-pos buf (car search)))))))
              (list (adh--picker-buffer-view buf pos) pos
                    (if (buffer-local-value 'adh--picker-partial buf)
                        (format "%s  (first %s)" title
@@ -608,9 +613,27 @@ Stop the external decoder at the preview limit or after one second."
      (when (buffer-live-p buf) (list 'buffer buf p)))
     (`(,(and (pred markerp) marker) . ,_) (adh--picker-marker-target marker))))
 
-(defun adh--picker-file-target (name &optional line)
-  "Return a file target for NAME at LINE, NAME relative to the prompt's directory."
-  (list 'file (expand-file-name name) line))
+(defun adh--picker-file-target (name &optional location)
+  "Return a file target for NAME, relative to the prompt's directory.
+LOCATION is a line number or (position . OFFSET) for a character position."
+  (list 'file (expand-file-name name) location))
+
+(defun adh--picker-register-target (key cand)
+  "Return a preview target for register KEY, displayed as CAND."
+  (when-let* ((value (get-register key)))
+    (or (adh--picker-marker-target value)
+        (pcase value
+          (`(file . ,file) (adh--picker-file-target file))
+          (`(file-query ,file ,pos)
+           (adh--picker-file-target file (cons 'position pos)))
+          (`(buffer . ,buf) (adh--picker-item-target 'buffer buf cand)))
+        (list 'text (format "Register %s" (single-key-description key))
+              (cond
+               ((stringp value) value)
+               ((numberp value) (number-to-string value))
+               ((and (consp value) (seq-every-p #'stringp value))
+                (string-join value "\n"))
+               (t (adh--picker-plain-string cand)))))))
 
 (defun adh--picker-grep-target (cand)
   "Return a file target for consult grep candidate CAND."
@@ -755,11 +778,14 @@ Stop the external decoder at the preview limit or after one second."
         (adh--picker-xref-target (get-text-property 0 'consult-xref cand)))
        ((get-text-property 0 'consult--candidate cand)
         (let ((item (get-text-property 0 'consult--candidate cand)))
-          (if (and (fboundp 'flymake-diagnostic-p) (flymake-diagnostic-p item))
-              (let ((buf (flymake-diagnostic-buffer item))
-                    (beg (flymake-diagnostic-beg item)))
-                (when (and (bufferp buf) (integerp beg)) (list 'buffer buf beg)))
-            (adh--picker-marker-target item))))
+          (cond
+           ((and (eq category 'multi-category) (characterp item))
+            (adh--picker-register-target item cand))
+           ((and (fboundp 'flymake-diagnostic-p) (flymake-diagnostic-p item))
+            (let ((buf (flymake-diagnostic-buffer item))
+                  (beg (flymake-diagnostic-beg item)))
+              (when (and (bufferp buf) (integerp beg)) (list 'buffer buf beg))))
+           (t (adh--picker-marker-target item)))))
        ((get-text-property 0 'multi-category cand)
         (let ((multi (get-text-property 0 'multi-category cand)))
           (adh--picker-item-target (car multi) (cdr multi) cand)))

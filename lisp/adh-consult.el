@@ -366,7 +366,7 @@ everything `consult-buffer' does, such as recent files and bookmarks."
 
   (defvar adh--consult-ripgrep-args-base consult-ripgrep-args)
 
-  (setq consult-fd-args '(adh--fd-program "--sort-by-depth --hidden --prune --color=never --exclude .git --path-separator=/"))
+  (setq consult-fd-args '(adh--fd-program "--sort-by-depth --hidden --color=never --exclude .git --path-separator=/"))
   (setq consult-ripgrep-args (concat adh--consult-ripgrep-args-base " --hidden -g !TAGS -g !*.{git,zip,tar,gz,tgz,bz2,tbz2,xz,txz,zst,tzst,7z,rar,lz4,lzma,Z,jar,war}"))
 
   (advice-add 'consult--fd-make-builder :around #'adh--consult-fd-scoped)
